@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. Verificar si ya estamos logueados
     const { data: { session } } = await supabaseClient.auth.getSession();
     
-    // Si hay sesión activa en el index, redirigir al dashboard
-    if (session && window.location.pathname.endsWith('index.html')) {
+    // Si hay sesión activa, redirigir al dashboard
+    if (session) {
         window.location.href = 'dashboard.html';
         return;
     }
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Scopes requeridos por SpotiDuel
                     scopes: 'user-read-currently-playing user-read-recently-played user-read-email user-read-private',
                     // Redirigir siempre al dashboard después del login
-                    redirectTo: window.location.origin + window.location.pathname.replace('index.html', 'dashboard.html')
+                    redirectTo: window.location.origin + '/dashboard.html'
                 }
             });
             
