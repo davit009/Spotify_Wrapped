@@ -35,23 +35,33 @@
     <script src="js/config.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            
-            if (!session) {
-                // Redirigir al index si no está logueado
-                window.location.href = 'index.html';
-                return;
-            }
+            // Escuchar cambios de estado de autenticación (más seguro para redirecciones OAuth)
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                console.log("Auth event:", event, "Session:", session);
+                
+                if (session) {
+                    // Actualizar la interfaz con datos de Spotify
+                    const userMeta = session.user.user_metadata;
+                    document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
+                    
+                    if (userMeta.avatar_url) {
+                        const avatarImg = document.getElementById('user-avatar');
+                        avatarImg.src = userMeta.avatar_url;
+                        avatarImg.classList.remove('hidden');
+                    }
+                } else {
+                    // Si realmente no hay sesión después de cargar, volver al inicio
+                    console.log("No hay sesión, deberíamos volver al index. Esperando 2 segundos...");
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
+                }
+            });
 
-            // Actualizar la interfaz con datos de Spotify
-            const userMeta = session.user.user_metadata;
-            document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
-            
-            if (userMeta.avatar_url) {
-                const avatarImg = document.getElementById('user-avatar');
-                avatarImg.src = userMeta.avatar_url;
-                avatarImg.classList.remove('hidden');
-            }
+            // Llamada inicial por si el evento no se dispara
+            const { data, error } = await supabaseClient.auth.getSession();
+            if (error) console.error("Error en getSession:", error);
+            console.log("Initial getSession:", data.session);
 
             // Lógica de Logout
             document.getElementById('logout-btn').addEventListener('click', async () => {
