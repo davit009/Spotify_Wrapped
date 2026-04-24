@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 options: {
                     // Scopes requeridos por SpotiDuel
                     scopes: 'user-read-currently-playing user-read-recently-played user-read-email user-read-private',
-                    // Redirigir siempre al dashboard después del login
-                    redirectTo: window.location.origin + '/dashboard.html'
+                    // Redirigir a la raíz para evitar problemas de rutas en Vercel
+                    redirectTo: window.location.origin
                 }
             });
             
