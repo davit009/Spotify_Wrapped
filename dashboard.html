@@ -35,7 +35,7 @@
     <script src="js/config.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session }, error } = await supabase.auth.getSession();
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
             
             if (!session) {
                 // Redirigir al index si no está logueado
@@ -55,7 +55,7 @@
 
             // Lógica de Logout
             document.getElementById('logout-btn').addEventListener('click', async () => {
-                await supabase.auth.signOut();
+                await supabaseClient.auth.signOut();
                 window.location.href = 'index.html';
             });
         });
