@@ -35,11 +35,16 @@
     <script src="js/config.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
+            let redirectTimeout;
+            
             // Escuchar cambios de estado de autenticación (más seguro para redirecciones OAuth)
             supabaseClient.auth.onAuthStateChange((event, session) => {
                 console.log("Auth event:", event, "Session:", session);
                 
                 if (session) {
+                    // Si encontramos sesión, cancelamos cualquier redirección pendiente
+                    if (redirectTimeout) clearTimeout(redirectTimeout);
+                    
                     // Actualizar la interfaz con datos de Spotify
                     const userMeta = session.user.user_metadata;
                     document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
@@ -50,9 +55,10 @@
                         avatarImg.classList.remove('hidden');
                     }
                 } else {
-                    // Si realmente no hay sesión después de cargar, volver al inicio
-                    console.log("No hay sesión, deberíamos volver al index. Esperando 2 segundos...");
-                    setTimeout(() => {
+                    // Si no hay sesión, programar la expulsión (por si no carga en 2 seg)
+                    console.log("No hay sesión aún. Esperando 2 segundos...");
+                    redirectTimeout = setTimeout(() => {
+                        console.log("Redirigiendo al index...");
                         window.location.href = 'index.html';
                     }, 2000);
                 }
