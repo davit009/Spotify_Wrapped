@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpotiDuel - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-[#121212] text-white min-h-screen p-6">
+    <nav class="max-w-4xl mx-auto flex justify-between items-center mb-10 border-b border-neutral-800 pb-4">
+        <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Duel</span></h1>
+        <div class="flex items-center gap-4">
+            <!-- Info de usuario -->
+            <img id="user-avatar" class="w-8 h-8 rounded-full hidden" alt="Avatar">
+            <span id="user-name" class="text-neutral-300 font-medium">Cargando...</span>
+            <button id="logout-btn" class="text-xs bg-neutral-800 hover:bg-neutral-700 px-3 py-1 rounded-md transition-colors">Salir</button>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Tarjeta Stats -->
+        <div class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 md:col-span-2 hover:bg-[#282828] transition-colors">
+            <h2 class="text-neutral-400 mb-1">Tiempo de Escucha (Batalla)</h2>
+            <div class="text-5xl font-bold mb-4">0<span class="text-lg text-[#1DB954] ml-1">h</span> 0<span class="text-lg text-[#1DB954] ml-1">m</span></div>
+            <p class="text-xs text-neutral-500">Desde tu registro</p>
+        </div>
+
+        <div class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 flex flex-col justify-center items-center hover:bg-[#282828] transition-colors">
+            <button class="bg-[#1DB954] text-black font-bold py-3 px-6 rounded-full hover:scale-105 transition-transform">Ver Leaderboard</button>
+            <p class="text-xs text-neutral-500 mt-4 text-center">Próximamente...</p>
+        </div>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            
+            if (!session) {
+                // Redirigir al index si no está logueado
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Actualizar la interfaz con datos de Spotify
+            const userMeta = session.user.user_metadata;
+            document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
+            
+            if (userMeta.avatar_url) {
+                const avatarImg = document.getElementById('user-avatar');
+                avatarImg.src = userMeta.avatar_url;
+                avatarImg.classList.remove('hidden');
+            }
+
+            // Lógica de Logout
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await supabase.auth.signOut();
+                window.location.href = 'index.html';
+            });
+        });
+    </script>
+</body>
+</html>
