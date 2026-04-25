@@ -21,7 +21,6 @@
             <!-- Info de usuario -->
             <img id="user-avatar" class="w-8 h-8 rounded-full hidden" alt="Avatar">
             <span id="user-name" class="text-neutral-300 font-medium hidden sm:inline">Cargando...</span>
-            <button id="logout-btn" class="text-xs bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 rounded-md transition-colors">Salir</button>
         </div>
     </nav>
 
@@ -122,7 +121,11 @@
                 </div>
             </div>
 
-            <div class="mt-8 flex justify-end">
+            <div class="mt-8 flex justify-between items-center border-t border-neutral-800 pt-6">
+                <button id="logout-btn" class="text-red-500 font-bold hover:text-red-400 transition-colors text-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    Cerrar Sesión
+                </button>
                 <button id="close-settings-btn" class="bg-white text-black font-bold py-2 px-6 rounded-full hover:scale-105 transition-transform text-sm">Cerrar</button>
             </div>
         </div>
@@ -246,7 +249,9 @@
             
             // 3. Fusionar si la preferencia está activa
             if (prefs.merge_history && userData?.historical_stats) {
-                totalMs += userData.historical_stats.totalMsPlayed || 0;
+                // Convertimos las horas guardadas de vuelta a milisegundos
+                const historicalMs = userData.historical_stats.totalMsPlayed || (userData.historical_stats.hours * 60 * 60 * 1000);
+                totalMs += historicalMs;
             }
             
             // 4. Calcular y renderizar

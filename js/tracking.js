@@ -29,11 +29,8 @@ async function checkCurrentlyPlaying() {
         // 204 significa que Spotify está pausado o apagado
         if (response.status === 204 || response.status > 400) {
             hideNowPlaying();
-            // Si acabamos de pausar, guardamos la canción que estábamos escuchando
-            if (currentTrackInfo) {
-                await saveTrackToDB(currentTrackInfo, session.user.id);
-                currentTrackInfo = null;
-            }
+            // IMPORTANTE: Ya no guardamos la canción ni la borramos de memoria al pausar.
+            // Así, si le da play a la misma canción, el sistema sabrá que sigue siendo la misma y no la duplicará.
             return;
         }
 
@@ -41,24 +38,31 @@ async function checkCurrentlyPlaying() {
         
         if (data && data.is_playing && data.item && data.item.type === 'track') {
             const track = data.item;
+            const currentProgress = data.progress_ms;
             showNowPlaying(track);
 
-            // Si cambió de canción, guardamos la canción ANTERIOR en la base de datos
-            if (currentTrackInfo && currentTrackInfo.id !== track.id) {
-                await saveTrackToDB(currentTrackInfo, session.user.id);
+            if (!currentTrackInfo) {
+                // Primera vez que detectamos una canción en esta sesión
+                currentTrackInfo = { id: track.id, duration_ms: track.duration_ms, progress_ms: currentProgress };
+            } else {
+                if (currentTrackInfo.id !== track.id) {
+                    // Cambió de canción, guardamos la ANTERIOR
+                    await saveTrackToDB(currentTrackInfo, session.user.id);
+                    currentTrackInfo = { id: track.id, duration_ms: track.duration_ms, progress_ms: currentProgress };
+                } else {
+                    // Sigue siendo la misma canción. Verificamos si se reinició (hizo Loop).
+                    // Si el progreso actual es menor a 15 segundos pero antes iba por la mitad o más...
+                    if (currentProgress < 15000 && currentTrackInfo.progress_ms > (track.duration_ms / 2)) {
+                        console.log("Loop detectado. Guardando vuelta anterior...");
+                        await saveTrackToDB(currentTrackInfo, session.user.id);
+                    }
+                    // Actualizamos el progreso en memoria
+                    currentTrackInfo.progress_ms = currentProgress;
+                }
             }
-            
-            // Actualizamos la canción que estamos monitoreando actualmente
-            currentTrackInfo = {
-                id: track.id,
-                duration_ms: track.duration_ms
-            };
         } else {
             hideNowPlaying();
-            if (currentTrackInfo) {
-                await saveTrackToDB(currentTrackInfo, session.user.id);
-                currentTrackInfo = null;
-            }
+            // Ya no la matamos aquí tampoco por si acaso
         }
     } catch (error) {
         console.error("Error tracking Spotify:", error);
