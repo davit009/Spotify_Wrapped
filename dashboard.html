@@ -12,6 +12,12 @@
         <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Stats</span></h1>
         <div class="flex items-center gap-3">
             <a href="profile.html" class="text-xs font-bold text-black bg-[#1DB954] hover:bg-[#1ed760] transition-colors px-3 py-1.5 rounded-full mr-2">Historia Musical</a>
+            
+            <!-- Botón Settings -->
+            <button id="settings-btn" class="text-neutral-400 hover:text-white transition-colors" title="Configuraciones">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+
             <!-- Info de usuario -->
             <img id="user-avatar" class="w-8 h-8 rounded-full hidden" alt="Avatar">
             <span id="user-name" class="text-neutral-300 font-medium hidden sm:inline">Cargando...</span>
@@ -94,6 +100,34 @@
         </div>
     </main>
 
+    <!-- Modal de Configuraciones -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <div class="bg-[#181818] p-8 rounded-2xl border border-neutral-800 w-full max-w-md shadow-2xl mx-4 transform transition-all scale-95 opacity-0" id="settings-modal-content">
+            <h2 class="text-2xl font-bold mb-6 text-white flex items-center gap-2">
+                <svg class="w-6 h-6 text-[#1DB954]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Configuraciones
+            </h2>
+            
+            <div class="space-y-6">
+                <!-- Toggle Merge History -->
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <p class="font-bold text-white">Fusionar Historial Pasado</p>
+                        <p class="text-xs text-neutral-400 mt-1">Suma las horas de tus archivos importados al marcador global del dashboard.</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="toggle-history" class="sr-only peer">
+                        <div class="w-11 h-6 bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1DB954]"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-end">
+                <button id="close-settings-btn" class="bg-white text-black font-bold py-2 px-6 rounded-full hover:scale-105 transition-transform text-sm">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/tracking.js"></script>
     <script>
@@ -154,26 +188,72 @@
                 await supabaseClient.auth.signOut();
                 window.location.href = 'index.html';
             });
+
+            // Lógica de Modal de Configuración
+            const settingsModal = document.getElementById('settings-modal');
+            const settingsModalContent = document.getElementById('settings-modal-content');
+            
+            document.getElementById('settings-btn').addEventListener('click', () => {
+                settingsModal.classList.remove('hidden');
+                setTimeout(() => {
+                    settingsModalContent.classList.remove('scale-95', 'opacity-0');
+                    settingsModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            });
+
+            document.getElementById('close-settings-btn').addEventListener('click', () => {
+                settingsModalContent.classList.remove('scale-100', 'opacity-100');
+                settingsModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => settingsModal.classList.add('hidden'), 150);
+            });
+
+            // Lógica de Guardado de Preferencia Toggle
+            document.getElementById('toggle-history').addEventListener('change', async (e) => {
+                const isChecked = e.target.checked;
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) {
+                    await supabaseClient.from('users').update({ 
+                        preferences: { merge_history: isChecked } 
+                    }).eq('id', session.user.id);
+                    // Recargar stats para reflejar el cambio al instante
+                    loadStats(session.user.id);
+                }
+            });
         });
 
         async function loadStats(userId) {
+            // 1. Cargar preferencias y datos históricos
+            const { data: userData } = await supabaseClient
+                .from('users')
+                .select('preferences, historical_stats')
+                .eq('id', userId)
+                .single();
+
+            const prefs = userData?.preferences || { merge_history: false };
+            const toggleEl = document.getElementById('toggle-history');
+            if (toggleEl) toggleEl.checked = prefs.merge_history;
+
+            // 2. Cargar sesiones nuevas
             const { data: sessions, error } = await supabaseClient
                 .from('listening_sessions')
                 .select('duration_ms')
                 .eq('user_id', userId);
                 
-            if (error) {
-                console.error("Error cargando estadísticas:", error);
-                return;
+            let totalMs = 0;
+            if (sessions) {
+                totalMs = sessions.reduce((acc, curr) => acc + curr.duration_ms, 0);
             }
             
-            // Sumar duraciones
-            const totalMs = sessions.reduce((acc, curr) => acc + curr.duration_ms, 0);
+            // 3. Fusionar si la preferencia está activa
+            if (prefs.merge_history && userData?.historical_stats) {
+                totalMs += userData.historical_stats.totalMsPlayed || 0;
+            }
+            
+            // 4. Calcular y renderizar
             const totalMinutes = Math.floor(totalMs / 60000);
             const hours = Math.floor(totalMinutes / 60);
             const minutes = totalMinutes % 60;
             
-            // Actualizar interfaz
             document.getElementById('total-hours').textContent = hours;
             document.getElementById('total-minutes').textContent = minutes;
         }
