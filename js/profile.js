@@ -65,11 +65,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkSavedStats(session) {
-    const { data, error } = await supabaseClient
+    // Leer token fresco de Spotify desde la BD (evita errores 401 por token expirado en session)
+    const { data: userData } = await supabaseClient
         .from('users')
-        .select('historical_stats, preferences')
+        .select('historical_stats, preferences, spotify_access_token')
         .eq('id', session.user.id)
         .single();
+
+    const spotifyToken = userData?.spotify_access_token || session.provider_token;
+    const data = userData;
         
     if (data && data.historical_stats) {
         document.getElementById('upload-section').classList.add('hidden');
@@ -107,10 +111,10 @@ async function checkSavedStats(session) {
                     .sort((a,b) => trackDurations[b] - trackDurations[a])
                     .slice(0, 10);
                 
-                // 4. Consultar a Spotify por esos 10
+                // 4. Consultar a Spotify por esos 10 (usando token fresco)
                 const fetchPromises = topTrackIds.map(async id => {
                     const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
-                        headers: { 'Authorization': `Bearer ${session.provider_token}` }
+                        headers: { 'Authorization': `Bearer ${spotifyToken}` }
                     });
                     if (res.ok) return await res.json();
                     return null;
@@ -141,7 +145,7 @@ async function checkSavedStats(session) {
             }
         }
         
-        renderStats(stats, session);
+        renderStats(stats, spotifyToken);
     }
 }
 
@@ -211,14 +215,21 @@ async function processFiles(files, session) {
     if (saveError) console.error("Error al guardar en BD:", saveError);
 
     document.getElementById('upload-section').classList.add('hidden');
-    renderStats(statsObj, session);
+    // Para el caso de subida manual, leemos el token fresco también
+    const { data: uData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', session.user.id).single();
+    const uploadToken = uData?.spotify_access_token || session.provider_token;
+    renderStats(statsObj, uploadToken);
 }
 
 // Variables para reproducir música
 let currentAudio = null;
 let currentPlayingBtn = null;
 
-async function renderStats(stats, session) {
+// SVG fallbacks para cuando no hay imagen de Spotify
+const TRACK_PLACEHOLDER = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='150' height='150' fill='%23181818'/%3E%3Ctext x='75' y='90' font-size='60' text-anchor='middle' fill='%231DB954'%3E%F0%9F%8E%B5%3C/text%3E%3C/svg%3E`;
+const ARTIST_PLACEHOLDER = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='150' height='150' fill='%23181818'/%3E%3Ctext x='75' y='90' font-size='60' text-anchor='middle' fill='%231DB954'%3E%F0%9F%8E%99%EF%B8%8F%3C/text%3E%3C/svg%3E`;
+
+async function renderStats(stats, spotifyToken) {
     document.getElementById('stat-hours').textContent = `${stats.hours}h`;
     document.getElementById('stat-artists').textContent = stats.totalUniqueArtists.toLocaleString();
     document.getElementById('stat-tracks').textContent = stats.totalUniqueTracks.toLocaleString();
@@ -234,13 +245,13 @@ async function renderStats(stats, session) {
     trackList.innerHTML = '';
     const trackPromises = stats.topTracks.map(async (track, index) => {
         const m = Math.floor(track.ms / (1000 * 60));
-        let imgUrl = 'https://via.placeholder.com/150/181818/1DB954?text=🎵';
+        let imgUrl = TRACK_PLACEHOLDER;
         let previewUrl = null;
         
         try {
             const query = `${track.trackName} ${track.artistName}`;
             const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, {
-                headers: { 'Authorization': `Bearer ${session.provider_token}` }
+                headers: { 'Authorization': `Bearer ${spotifyToken}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -283,11 +294,11 @@ async function renderStats(stats, session) {
     // Promesas para buscar artistas
     const artistPromises = stats.topArtists.map(async (artist, index) => {
         const h = Math.floor(artist.ms / (1000 * 60 * 60));
-        let imgUrl = 'https://via.placeholder.com/150/181818/1DB954?text=🎙️';
+        let imgUrl = ARTIST_PLACEHOLDER;
         
         try {
             const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(artist.name)}&type=artist&limit=1`, {
-                headers: { 'Authorization': `Bearer ${session.provider_token}` }
+                headers: { 'Authorization': `Bearer ${spotifyToken}` }
             });
             if (res.ok) {
                 const data = await res.json();
