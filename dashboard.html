@@ -30,9 +30,26 @@
             <button class="bg-[#1DB954] text-black font-bold py-3 px-6 rounded-full hover:scale-105 transition-transform">Ver Leaderboard</button>
             <p class="text-xs text-neutral-500 mt-4 text-center">Próximamente...</p>
         </div>
+
+        <!-- Contenedor Now Playing -->
+        <div id="now-playing-card" class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 md:col-span-3 flex items-center gap-4 hidden hover:bg-[#282828] transition-colors mt-2">
+            <img id="np-image" class="w-16 h-16 rounded-md shadow-md object-cover" src="" alt="Album Art">
+            <div class="flex-1 overflow-hidden">
+                <p class="text-xs text-[#1DB954] font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1DB954] opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-[#1DB954]"></span>
+                    </span>
+                    Escuchando ahora
+                </p>
+                <h3 id="np-title" class="text-lg font-bold text-white truncate">Canción</h3>
+                <p id="np-artist" class="text-sm text-neutral-400 truncate">Artista</p>
+            </div>
+        </div>
     </main>
 
     <script src="js/config.js"></script>
+    <script src="js/tracking.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             let redirectTimeout;
