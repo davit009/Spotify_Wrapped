@@ -37,13 +37,78 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkSavedStats(session) {
     const { data, error } = await supabaseClient
         .from('users')
-        .select('historical_stats')
+        .select('historical_stats, preferences')
         .eq('id', session.user.id)
         .single();
         
     if (data && data.historical_stats) {
         document.getElementById('upload-section').classList.add('hidden');
-        renderStats(data.historical_stats, session);
+        document.getElementById('header-desc').classList.add('hidden');
+        
+        let stats = JSON.parse(JSON.stringify(data.historical_stats));
+        const prefs = data.preferences || { merge_history: false };
+        
+        if (prefs.merge_history) {
+            // 1. Obtener sesiones recientes para mezclar
+            const { data: sessions } = await supabaseClient
+                .from('listening_sessions')
+                .select('track_id, duration_ms')
+                .eq('user_id', session.user.id);
+                
+            if (sessions && sessions.length > 0) {
+                const trackDurations = {};
+                let totalFreshMs = 0;
+                sessions.forEach(s => {
+                    trackDurations[s.track_id] = (trackDurations[s.track_id] || 0) + s.duration_ms;
+                    totalFreshMs += s.duration_ms;
+                });
+                
+                // 2. Sumar horas totales
+                const totalMsHistory = stats.totalMsPlayed || (stats.hours * 60 * 60 * 1000);
+                const combinedMs = totalMsHistory + totalFreshMs;
+                stats.hours = Math.floor(combinedMs / 3600000);
+                stats.totalMsPlayed = combinedMs;
+                
+                // 3. Obtener el top 10 reciente
+                const topTrackIds = Object.keys(trackDurations)
+                    .sort((a,b) => trackDurations[b] - trackDurations[a])
+                    .slice(0, 10);
+                
+                // 4. Consultar a Spotify por esos 10
+                const fetchPromises = topTrackIds.map(async id => {
+                    const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+                        headers: { 'Authorization': `Bearer ${session.provider_token}` }
+                    });
+                    if (res.ok) return await res.json();
+                    return null;
+                });
+                
+                const spotifyTracks = (await Promise.all(fetchPromises)).filter(Boolean);
+                
+                // 5. Mezclar en las listas históricas
+                spotifyTracks.forEach(t => {
+                    const dur = trackDurations[t.id];
+                    
+                    // Mezclar Canción
+                    const existingTrack = stats.topTracks.find(x => x.trackName === t.name);
+                    if (existingTrack) existingTrack.ms += dur;
+                    else stats.topTracks.push({ trackName: t.name, artistName: t.artists[0].name, ms: dur });
+                    
+                    // Mezclar Artistas
+                    t.artists.forEach(a => {
+                        const existingArtist = stats.topArtists.find(x => x.name === a.name);
+                        if (existingArtist) existingArtist.ms += dur;
+                        else stats.topArtists.push({ name: a.name, ms: dur });
+                    });
+                });
+                
+                // 6. Re-ordenar y cortar a 10 de nuevo
+                stats.topTracks = stats.topTracks.sort((a,b) => b.ms - a.ms).slice(0, 10);
+                stats.topArtists = stats.topArtists.sort((a,b) => b.ms - a.ms).slice(0, 10);
+            }
+        }
+        
+        renderStats(stats, session);
     }
 }
 
