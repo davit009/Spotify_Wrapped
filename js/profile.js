@@ -156,43 +156,47 @@ async function checkSavedStats(session) {
 
         let stats = JSON.parse(JSON.stringify(data.historical_stats));
 
-        if (prefs.merge_history) {
-            const { data: sessions } = await supabaseClient
-                .from('listening_sessions')
-                .select('track_id, duration_ms')
-                .eq('user_id', session.user.id);
+        // === SIEMPRE: sumar horas acumuladas en tiempo real al total ===
+        // (independientemente del toggle)
+        const { data: realtimeSessions } = await supabaseClient
+            .from('listening_sessions')
+            .select('track_id, duration_ms')
+            .eq('user_id', session.user.id);
 
-            if (sessions?.length > 0) {
-                const trackDurations = {};
-                let totalFreshMs = 0;
-                sessions.forEach(s => {
-                    trackDurations[s.track_id] = (trackDurations[s.track_id] || 0) + s.duration_ms;
-                    totalFreshMs += s.duration_ms;
+        let totalRealtimeMs = 0;
+        const trackDurations = {};
+        if (realtimeSessions?.length > 0) {
+            realtimeSessions.forEach(s => {
+                trackDurations[s.track_id] = (trackDurations[s.track_id] || 0) + s.duration_ms;
+                totalRealtimeMs += s.duration_ms;
+            });
+            // Sumar horas al total siempre
+            const combinedMs = (stats.totalMsPlayed || stats.hours * 3600000) + totalRealtimeMs;
+            stats.hours = Math.floor(combinedMs / 3600000);
+            stats.totalMsPlayed = combinedMs;
+        }
+
+        // === OPCIONAL (toggle): fusionar top artistas/canciones con los de tiempo real ===
+        if (prefs.merge_history && totalRealtimeMs > 0 && spotifyToken) {
+            const topIds = Object.keys(trackDurations).sort((a,b) => trackDurations[b]-trackDurations[a]).slice(0,10);
+            const freshTracks = (await Promise.all(
+                topIds.map(async id => {
+                    const r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, { headers: { Authorization: `Bearer ${spotifyToken}` } });
+                    return r.ok ? r.json() : null;
+                })
+            )).filter(Boolean);
+
+            freshTracks.forEach(t => {
+                const dur = trackDurations[t.id];
+                const ex = stats.topTracks.find(x => x.trackName === t.name);
+                if (ex) ex.ms += dur; else stats.topTracks.push({ trackName: t.name, artistName: t.artists[0].name, ms: dur });
+                t.artists.forEach(a => {
+                    const ea = stats.topArtists.find(x => x.name === a.name);
+                    if (ea) ea.ms += dur; else stats.topArtists.push({ name: a.name, ms: dur });
                 });
-                const combinedMs = (stats.totalMsPlayed || stats.hours * 3600000) + totalFreshMs;
-                stats.hours = Math.floor(combinedMs / 3600000);
-                stats.totalMsPlayed = combinedMs;
-
-                const topIds = Object.keys(trackDurations).sort((a,b) => trackDurations[b]-trackDurations[a]).slice(0,10);
-                const freshTracks = (await Promise.all(
-                    topIds.map(async id => {
-                        const r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, { headers: { Authorization: `Bearer ${spotifyToken}` } });
-                        return r.ok ? r.json() : null;
-                    })
-                )).filter(Boolean);
-
-                freshTracks.forEach(t => {
-                    const dur = trackDurations[t.id];
-                    const ex = stats.topTracks.find(x => x.trackName === t.name);
-                    if (ex) ex.ms += dur; else stats.topTracks.push({ trackName: t.name, artistName: t.artists[0].name, ms: dur });
-                    t.artists.forEach(a => {
-                        const ea = stats.topArtists.find(x => x.name === a.name);
-                        if (ea) ea.ms += dur; else stats.topArtists.push({ name: a.name, ms: dur });
-                    });
-                });
-                stats.topTracks  = stats.topTracks.sort((a,b) => b.ms-a.ms).slice(0,10);
-                stats.topArtists = stats.topArtists.sort((a,b) => b.ms-a.ms).slice(0,10);
-            }
+            });
+            stats.topTracks  = stats.topTracks.sort((a,b)  => b.ms-a.ms).slice(0,10);
+            stats.topArtists = stats.topArtists.sort((a,b) => b.ms-a.ms).slice(0,10);
         }
 
         globalStats = stats;
@@ -361,10 +365,10 @@ async function renderStats(stats, spotifyToken, year = 'all') {
     document.getElementById('results').classList.remove('hidden');
 
     // Count-up animado
-    animateCounter(document.getElementById('stat-hours'),   stats.hours,              'h');
-    animateCounter(document.getElementById('stat-days'),    stats.totalDays || 0,     '');
-    animateCounter(document.getElementById('stat-tracks'),  stats.totalUniqueTracks), '';
-    animateCounter(document.getElementById('stat-artists'), stats.totalUniqueArtists, '');
+    animateCounter(document.getElementById('stat-hours'),   stats.hours,             'h');
+    animateCounter(document.getElementById('stat-days'),    stats.totalDays || 0,    '');
+    animateCounter(document.getElementById('stat-tracks'),  stats.totalUniqueTracks, '');
+    animateCounter(document.getElementById('stat-artists'), stats.totalUniqueArtists,'');
 
     // Mostrar skeletons, ocultar listas
     showSkeletons();

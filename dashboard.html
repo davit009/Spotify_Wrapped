@@ -164,76 +164,61 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             let redirectTimeout;
-            
-            // Escuchar cambios de estado de autenticación (más seguro para redirecciones OAuth)
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log("Auth event:", event, "Session:", session);
-                
-                if (session) {
-                    // Si encontramos sesión, cancelamos cualquier redirección pendiente
-                    if (redirectTimeout) clearTimeout(redirectTimeout);
-                    
-                    // IMPORTANTE: Asegurar que el usuario exista físicamente en public.users 
-                    // Y guardar su token de refresco para el tracking automático (Fase 3)
-                    let updatePayload = { id: session.user.id };
-                    let hasNewTokens = false;
-                    if (session.provider_refresh_token) { updatePayload.spotify_refresh_token = session.provider_refresh_token; hasNewTokens = true; }
-                    if (session.provider_token) { updatePayload.spotify_access_token = session.provider_token; hasNewTokens = true; }
-                    
-                    if (hasNewTokens) {
-                        try {
-                            await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id' });
-                            console.log("Usuario y Tokens asegurados en BD.");
-                        } catch (err) {
-                            console.error("Error al hacer upsert de tokens:", err);
-                        }
-                    }
+            let initialized = false;
 
-                    // Recuperar el token más fresco de la BD (por si el background job lo actualizó o Supabase lo omitió del getSession)
-                    const { data: userData } = await supabaseClient
-                        .from('users')
-                        .select('spotify_access_token')
-                        .eq('id', session.user.id)
-                        .single();
-                        
-                    if (userData && userData.spotify_access_token) {
-                        session.provider_token = userData.spotify_access_token;
-                    }
+            async function initDashboard(session) {
+                if (initialized) return;
+                initialized = true;
+                if (redirectTimeout) clearTimeout(redirectTimeout);
 
-                    // Actualizar la interfaz con datos de Spotify
-                    const userMeta = session.user.user_metadata;
-                    document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
-                    
-                    if (userMeta.avatar_url) {
-                        const avatarImg = document.getElementById('user-avatar');
-                        avatarImg.src = userMeta.avatar_url;
-                        avatarImg.classList.remove('hidden');
-                    }
-                    
-                    loadStats(session.user.id);
-                    // Sincronizar historial offline antes de cargar dinámicas
-                    if (typeof syncOfflineHistory === 'function') {
-                        syncOfflineHistory(session).then(() => loadDynamicStats(session));
-                    } else {
-                        loadDynamicStats(session);
-                    }
-                    
-                    // Actualizar si tracking.js guarda una nueva canción
-                    document.addEventListener('trackSaved', () => loadStats(session.user.id));
+                // Guardar tokens frescos en BD si vienen en la sesión (solo tras OAuth)
+                let updatePayload = { id: session.user.id };
+                let hasNewTokens = false;
+                if (session.provider_refresh_token) { updatePayload.spotify_refresh_token = session.provider_refresh_token; hasNewTokens = true; }
+                if (session.provider_token)         { updatePayload.spotify_access_token  = session.provider_token;         hasNewTokens = true; }
+                if (hasNewTokens) {
+                    try { await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id' }); }
+                    catch (err) { console.error('Error guardando tokens:', err); }
+                }
+
+                // Recuperar el token más fresco de la BD
+                const { data: userData } = await supabaseClient
+                    .from('users').select('spotify_access_token').eq('id', session.user.id).single();
+                if (userData?.spotify_access_token) session.provider_token = userData.spotify_access_token;
+
+                // Actualizar UI con datos del usuario
+                const userMeta = session.user.user_metadata;
+                document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
+                if (userMeta.avatar_url) {
+                    const avatarImg = document.getElementById('user-avatar');
+                    avatarImg.src = userMeta.avatar_url;
+                    avatarImg.classList.remove('hidden');
+                }
+
+                loadStats(session.user.id);
+                if (typeof syncOfflineHistory === 'function') {
+                    syncOfflineHistory(session).then(() => loadDynamicStats(session));
                 } else {
-                    // Si no hay sesión, programar la expulsión (por si no carga en 2 seg)
-                    console.log("No hay sesión aún. Esperando 2 segundos...");
-                    redirectTimeout = setTimeout(() => {
-                        console.log("Redirigiendo al index...");
-                        window.location.href = 'index.html';
-                    }, 2000);
+                    loadDynamicStats(session);
+                }
+                document.addEventListener('trackSaved', () => loadStats(session.user.id));
+            }
+
+            // 1. Intentar sesión inmediata con getSession() — no espera eventos
+            const { data: { session: immediateSession } } = await supabaseClient.auth.getSession();
+            if (immediateSession) {
+                await initDashboard(immediateSession);
+            } else {
+                // 2. Fallback: esperar onAuthStateChange (para el flujo OAuth de callback)
+                redirectTimeout = setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+            }
+
+            // Siempre escuchar cambios (para el callback OAuth y renovaciones de token)
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                if (session) {
+                    await initDashboard(session);
                 }
             });
-
-            // Llamada inicial por si el evento no se dispara
-            const { data, error } = await supabaseClient.auth.getSession();
-            if (error) console.error("Error en getSession:", error);
-            console.log("Initial getSession:", data.session);
 
             // Lógica de Logout
             document.getElementById('logout-btn').addEventListener('click', async () => {
