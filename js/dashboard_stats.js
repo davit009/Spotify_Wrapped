@@ -118,6 +118,15 @@ async function fetchTracksFromSpotify(ids, token) {
     if (missingIds.length === 0) return;
 
     for (const id of missingIds) {
+        // Buscar primero en localStorage
+        try {
+            const cached = localStorage.getItem('spotify_track_' + id);
+            if (cached) {
+                globalStats.spotifyCache[id] = JSON.parse(cached);
+                continue;
+            }
+        } catch(e) {}
+
         try {
             const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -125,14 +134,17 @@ async function fetchTracksFromSpotify(ids, token) {
             if (res.ok) {
                 const trackData = await res.json();
                 globalStats.spotifyCache[trackData.id] = trackData;
+                try {
+                    localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData));
+                } catch(e) {} // Ignorar quota exceeded
             } else if (res.status === 401 || res.status === 400) {
-                console.warn(`Token de Spotify expirado al obtener track ${id}. Omitiendo.`);
+                console.warn(`Token expirado al pedir track ${id}.`);
             } else if (res.status === 429) {
-                console.warn(`Límite de Spotify alcanzado al pedir track ${id}. Esperando 1 segundo...`);
+                console.warn(`Límite 429 alcanzado para track ${id}. Esperando 1 segundo...`);
                 await new Promise(r => setTimeout(r, 1000));
             }
         } catch(e) {
-            console.error("Error pidiendo track individual:", e);
+            console.error("Error individual:", e);
         }
     }
 }
