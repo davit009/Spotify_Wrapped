@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 provider: 'spotify',
                 options: {
                     // Scopes requeridos por SpotiDuel
-                    scopes: 'user-read-currently-playing user-read-recently-played user-read-email user-read-private',
+                    scopes: 'user-read-currently-playing user-modify-playback-state user-read-playback-state user-read-recently-played user-read-email user-read-private',
                     // Redirigir a la raíz para evitar problemas de rutas en Vercel
                     redirectTo: window.location.origin
                 }

@@ -58,7 +58,32 @@
                         Escuchando ahora
                     </p>
                     <h3 id="np-title" class="text-2xl sm:text-3xl font-black text-white truncate mb-1">Canción</h3>
-                    <p id="np-artist" class="text-base sm:text-lg text-neutral-300 truncate">Artista</p>
+                    <p id="np-artist" class="text-base sm:text-lg text-neutral-300 truncate mb-4">Artista</p>
+                    
+                    <!-- Controles de Reproducción -->
+                    <div class="flex items-center justify-center sm:justify-start gap-4">
+                        <button id="player-prev" class="p-2 text-neutral-400 hover:text-white transition-colors hover:bg-white/10 rounded-full" title="Anterior">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                        </button>
+                        <button id="player-play-pause" class="p-3 bg-white text-black hover:scale-105 transition-transform rounded-full shadow-lg" title="Reproducir/Pausar">
+                            <svg id="play-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <svg id="pause-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        </button>
+                        <button id="player-next" class="p-2 text-neutral-400 hover:text-white transition-colors hover:bg-white/10 rounded-full" title="Siguiente">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zm9-12v12h2V6z"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Barra de Progreso -->
+                    <div class="mt-4 w-full">
+                        <div class="flex justify-between text-[10px] text-neutral-400 mb-1 font-mono">
+                            <span id="np-current-time">0:00</span>
+                            <span id="np-duration">0:00</span>
+                        </div>
+                        <div class="w-full bg-white/10 h-1 rounded-full overflow-hidden">
+                            <div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 ease-linear"></div>
+                        </div>
+                    </div>
                 </div>
                 <!-- Decoración de fondo -->
                 <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
