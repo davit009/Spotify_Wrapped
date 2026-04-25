@@ -41,17 +41,27 @@ async function loadDynamicStats(session) {
 
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    
+
     const { data: recentSessions, error } = await supabaseClient
         .from('listening_sessions')
         .select('track_id, duration_ms, played_at')
+        .eq('user_id', userId)
         .gte('played_at', weekAgo.toISOString())
         .order('played_at', { ascending: false });
 
-    if (error || !recentSessions || recentSessions.length === 0) {
-        document.getElementById('recent-tracks-list').innerHTML = '<p class="text-neutral-500 text-sm py-4">No hay historial reciente.</p>';
+    if (error) {
+        console.error('Error leyendo listening_sessions:', JSON.stringify(error));
+        document.getElementById('recent-tracks-list').innerHTML =
+            '<p class="text-neutral-500 text-sm py-4">Error al leer el historial.</p>';
         return;
     }
+
+    if (!recentSessions || recentSessions.length === 0) {
+        document.getElementById('recent-tracks-list').innerHTML =
+            '<p class="text-neutral-500 text-sm py-4">No hay historial reciente. Escucha algo en Spotify.</p>';
+        return;
+    }
+
 
     // Guardar para modal
     globalStats.recent = recentSessions.slice(0, 20); // Limitamos a 20 para no saturar la API

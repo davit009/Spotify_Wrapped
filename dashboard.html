@@ -199,10 +199,15 @@
                     catch (err) { console.error('Error guardando tokens:', err); }
                 }
 
-                // Recuperar el token más fresco de la BD
-                const { data: userData } = await supabaseClient
-                    .from('users').select('spotify_access_token').eq('id', session.user.id).single();
-                if (userData?.spotify_access_token) session.provider_token = userData.spotify_access_token;
+                // Recuperar token de Spotify:
+                // - Si session.provider_token ya tiene valor (justo tras OAuth), usarlo directamente
+                // - Solo leer de BD como fallback (navegaciones normales post-login)
+                if (!session.provider_token) {
+                    const { data: userData } = await supabaseClient
+                        .from('users').select('spotify_access_token').eq('id', session.user.id).single();
+                    if (userData?.spotify_access_token) session.provider_token = userData.spotify_access_token;
+                }
+                console.log('🔑 Token disponible:', session.provider_token ? '✅ Sí' : '❌ No');
 
                 // Actualizar UI con datos del usuario
                 const userMeta = session.user.user_metadata;
