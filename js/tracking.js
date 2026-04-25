@@ -45,6 +45,10 @@ async function checkCurrentlyPlaying() {
         
         if (data && data.item && data.item.type === 'track') {
             const track = data.item;
+            
+            // Cachar en localStorage para que dashboard_stats.js no tenga que pedirlo de nuevo
+            try { localStorage.setItem('spotify_track_' + track.id, JSON.stringify(track)); } catch(e) {}
+
             const isPlaying = data.is_playing;
             const currentProgress = data.progress_ms;
             
@@ -232,12 +236,19 @@ async function syncOfflineHistory(session) {
         if (!response.ok) return;
         const data = await response.json();
         if (data.items && data.items.length > 0) {
-            const sessionsToInsert = data.items.map(item => ({
-                user_id: session.user.id,
-                track_id: item.track.id,
-                duration_ms: item.track.duration_ms,
-                played_at: item.played_at
-            }));
+            const sessionsToInsert = data.items.map(item => {
+                // Guardar track en caché local para evitar error 429 en el dashboard
+                try {
+                    localStorage.setItem('spotify_track_' + item.track.id, JSON.stringify(item.track));
+                } catch(e) {}
+                
+                return {
+                    user_id: session.user.id,
+                    track_id: item.track.id,
+                    duration_ms: item.track.duration_ms,
+                    played_at: item.played_at
+                };
+            });
             const { error } = await supabaseClient.from('listening_sessions')
                 .upsert(sessionsToInsert, { onConflict: 'user_id, played_at', ignoreDuplicates: true });
             if (!error) document.dispatchEvent(new CustomEvent('trackSaved'));
