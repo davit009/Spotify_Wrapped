@@ -281,11 +281,23 @@
                 totalMs = sessions.reduce((acc, curr) => acc + curr.duration_ms, 0);
             }
             
-            // 3. Fusionar si la preferencia está activa
+            // 3. Fusionar historial del AÑO EN CURSO si la preferencia está activa
+            // (no sumamos todos los años del historial importado, solo el año actual)
             if (prefs.merge_history && userData?.historical_stats) {
-                // Convertimos las horas guardadas de vuelta a milisegundos
-                const historicalMs = userData.historical_stats.totalMsPlayed || (userData.historical_stats.hours * 60 * 60 * 1000);
-                totalMs += historicalMs;
+                const currentYear = new Date().getFullYear().toString();
+                const hist = userData.historical_stats;
+
+                if (hist.yearlyStats?.[currentYear]) {
+                    // Tenemos datos por año → solo sumamos el año en curso
+                    const yearMs = hist.yearlyStats[currentYear].totalMsPlayed
+                                || (hist.yearlyStats[currentYear].hours * 3600000);
+                    totalMs += yearMs;
+                } else if (!hist.yearlyStats) {
+                    // Formato antiguo sin desglose por año → sumamos todo (fallback)
+                    const histMs = hist.totalMsPlayed || (hist.hours * 3600000);
+                    totalMs += histMs;
+                }
+                // Si hay yearlyStats pero no tiene el año actual, no sumamos nada del JSON
             }
             
             // 4. Calcular y renderizar

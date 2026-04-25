@@ -310,10 +310,44 @@ async function processFiles(files, session) {
 
     setProgress(progressFill, progressText, 90, 'Guardando en la nube...');
 
-    await supabaseClient.from('users').upsert({ id: session.user.id, historical_stats: statsObj }, { onConflict: 'id' });
+    // Limpiar URIs para reducir tamaño antes de guardar
+    // (los URIs no se usan para mostrar datos, solo para identificar pistas)
+    const statsToSave = JSON.parse(JSON.stringify(statsObj));
+    statsToSave.topTracks.forEach(t => delete t.uri);
+    Object.values(statsToSave.yearlyStats || {}).forEach(ys => {
+        ys.topTracks?.forEach(t => delete t.uri);
+    });
 
-    setProgress(progressFill, progressText, 100, '¡Listo!');
-    setTimeout(() => progressBar?.classList.add('hidden'), 600);
+    const payloadSize = JSON.stringify(statsToSave).length;
+    console.log(`Tamaño del payload: ${(payloadSize / 1024).toFixed(1)} KB`);
+
+    const { error: saveError } = await supabaseClient
+        .from('users')
+        .upsert({ id: session.user.id, historical_stats: statsToSave }, { onConflict: 'id' });
+
+
+    if (saveError) {
+        console.error('Error al guardar historial en Supabase:', saveError);
+        setProgress(progressFill, progressText, 100, '⚠️ Error al guardar. Revisa la consola.');
+        // Mostramos igual los datos aunque no se guardaron
+    } else {
+        // Verificar que realmente se guardó
+        const { data: verifyData } = await supabaseClient
+            .from('users')
+            .select('historical_stats')
+            .eq('id', session.user.id)
+            .single();
+
+        if (verifyData?.historical_stats) {
+            console.log('✅ Historial guardado correctamente en Supabase.');
+            setProgress(progressFill, progressText, 100, '¡Guardado correctamente!');
+        } else {
+            console.error('⚠️ El upsert no reportó error, pero los datos no están en la BD.');
+            setProgress(progressFill, progressText, 100, '⚠️ No se pudo verificar el guardado.');
+        }
+    }
+
+    setTimeout(() => progressBar?.classList.add('hidden'), 1200);
 
     document.getElementById('upload-section').classList.add('hidden');
     document.getElementById('header-desc').classList.add('hidden');
