@@ -311,7 +311,6 @@ async function processFiles(files, session) {
     setProgress(progressFill, progressText, 90, 'Guardando en la nube...');
 
     // Limpiar URIs para reducir tamaño antes de guardar
-    // (los URIs no se usan para mostrar datos, solo para identificar pistas)
     const statsToSave = JSON.parse(JSON.stringify(statsObj));
     statsToSave.topTracks.forEach(t => delete t.uri);
     Object.values(statsToSave.yearlyStats || {}).forEach(ys => {
@@ -319,35 +318,41 @@ async function processFiles(files, session) {
     });
 
     const payloadSize = JSON.stringify(statsToSave).length;
-    console.log(`Tamaño del payload: ${(payloadSize / 1024).toFixed(1)} KB`);
+    console.log(`📦 Tamaño del payload: ${(payloadSize / 1024).toFixed(1)} KB`);
 
-    const { error: saveError } = await supabaseClient
+    // Usamos UPDATE (no upsert) porque la fila del usuario ya existe desde el login OAuth.
+    // upsert puede fallar silenciosamente si las políticas RLS no permiten INSERT en la misma tabla.
+    const { error: saveError, data: saveData } = await supabaseClient
         .from('users')
-        .upsert({ id: session.user.id, historical_stats: statsToSave }, { onConflict: 'id' });
-
+        .update({ historical_stats: statsToSave })
+        .eq('id', session.user.id)
+        .select('id');  // Pedir 'id' de vuelta: si no se actualizó ninguna fila, data estará vacío
 
     if (saveError) {
-        console.error('Error al guardar historial en Supabase:', saveError);
-        setProgress(progressFill, progressText, 100, '⚠️ Error al guardar. Revisa la consola.');
-        // Mostramos igual los datos aunque no se guardaron
-    } else {
-        // Verificar que realmente se guardó
-        const { data: verifyData } = await supabaseClient
+        console.error('❌ Error de Supabase al guardar:', JSON.stringify(saveError));
+        setProgress(progressFill, progressText, 100, '⚠️ Error al guardar. Abre la consola para ver el detalle.');
+    } else if (!saveData || saveData.length === 0) {
+        // El UPDATE no afectó ninguna fila — la fila no existe todavía
+        // Esto pasa si el usuario nunca había sido insertado en la tabla users.
+        console.warn('⚠️ UPDATE no afectó filas. Intentando INSERT...');
+        const { error: insertError } = await supabaseClient
             .from('users')
-            .select('historical_stats')
-            .eq('id', session.user.id)
-            .single();
+            .insert({ id: session.user.id, historical_stats: statsToSave });
 
-        if (verifyData?.historical_stats) {
-            console.log('✅ Historial guardado correctamente en Supabase.');
-            setProgress(progressFill, progressText, 100, '¡Guardado correctamente!');
+        if (insertError) {
+            console.error('❌ Error en INSERT de fallback:', JSON.stringify(insertError));
+            setProgress(progressFill, progressText, 100, '⚠️ No se pudo guardar. Revisa la consola.');
         } else {
-            console.error('⚠️ El upsert no reportó error, pero los datos no están en la BD.');
-            setProgress(progressFill, progressText, 100, '⚠️ No se pudo verificar el guardado.');
+            console.log('✅ Historial insertado con INSERT de fallback.');
+            setProgress(progressFill, progressText, 100, '¡Guardado correctamente!');
         }
+    } else {
+        console.log('✅ Historial guardado correctamente. Fila actualizada:', saveData[0]?.id);
+        setProgress(progressFill, progressText, 100, '¡Guardado correctamente!');
     }
 
     setTimeout(() => progressBar?.classList.add('hidden'), 1200);
+
 
     document.getElementById('upload-section').classList.add('hidden');
     document.getElementById('header-desc').classList.add('hidden');

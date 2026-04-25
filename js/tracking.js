@@ -102,16 +102,36 @@ function showNowPlaying(track) {
 
     title.textContent = track.name;
     artist.textContent = track.artists.map(a => a.name).join(', ');
+
     if (track.album.images.length > 0) {
-        image.src = track.album.images[0].url;
+        const albumUrl = track.album.images[0].url;
+        image.src = albumUrl;
+
+        // Fondo dinámico difuminado con la portada del álbum
+        const bg = document.getElementById('album-bg');
+        if (bg) {
+            // Solo cambiamos si es un álbum diferente (evita parpadeo)
+            const currentBg = bg.style.backgroundImage;
+            const newBg = `url(${albumUrl})`;
+            if (currentBg !== newBg) {
+                bg.style.backgroundImage = newBg;
+            }
+            bg.classList.add('visible');
+        }
     }
 
     card.classList.remove('hidden');
 }
 
 function hideNowPlaying() {
-    document.getElementById('now-playing').classList.add('hidden');
-    currentTrackInfo = null; // Reseteamos si no hay nada
+    const card = document.getElementById('now-playing-card');
+    if (card) card.classList.add('hidden');
+
+    // Desvanecer el fondo del álbum suavemente
+    const bg = document.getElementById('album-bg');
+    if (bg) bg.classList.remove('visible');
+
+    currentTrackInfo = null;
 }
 
 // Iniciar el rastreo cada 5 segundos

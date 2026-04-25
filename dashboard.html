@@ -6,8 +6,26 @@
     <title>SpotiStats - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        #album-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-size: cover;
+            background-position: center;
+            filter: blur(90px) brightness(0.22) saturate(2);
+            transform: scale(1.2);
+            opacity: 0;
+            transition: opacity 2.5s ease;
+            pointer-events: none;
+        }
+        #album-bg.visible { opacity: 1; }
+        body > *:not(#album-bg) { position: relative; z-index: 1; }
+    </style>
 </head>
 <body class="bg-[#121212] text-white min-h-screen p-6">
+    <!-- Fondo dinámico del álbum en reproducción -->
+    <div id="album-bg"></div>
     <nav class="max-w-4xl mx-auto flex justify-between items-center mb-10 border-b border-neutral-800 pb-4">
         <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Stats</span></h1>
         <div class="flex items-center gap-3">
@@ -204,16 +222,18 @@
                 document.addEventListener('trackSaved', () => loadStats(session.user.id));
             }
 
-            // 1. Intentar sesión inmediata con getSession() — no espera eventos
-            const { data: { session: immediateSession } } = await supabaseClient.auth.getSession();
-            if (immediateSession) {
-                await initDashboard(immediateSession);
-            } else {
-                // 2. Fallback: esperar onAuthStateChange (para el flujo OAuth de callback)
+            // === ESTRATEGIA DE AUTH ===
+            // getSession() → rápido, solo decide si hay sesión para no redirigir prematuramente
+            // onAuthStateChange → init real del dashboard (auth context y RLS completamente listos)
+            // Este orden garantiza que las queries a listening_sessions funcionen correctamente.
+
+            const { data: { session: quickCheck } } = await supabaseClient.auth.getSession();
+            if (!quickCheck) {
+                // Sin sesión conocida → redirigir si onAuthStateChange tampoco trae una
                 redirectTimeout = setTimeout(() => { window.location.href = 'index.html'; }, 3000);
             }
 
-            // Siempre escuchar cambios (para el callback OAuth y renovaciones de token)
+            // Init principal siempre via onAuthStateChange
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (session) {
                     await initDashboard(session);
