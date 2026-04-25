@@ -142,8 +142,8 @@ async function fetchTracksFromSpotify(ids, token) {
             } else if (res.status === 429) {
                 const retryAfter = res.headers.get('Retry-After');
                 const waitSecs = retryAfter ? parseInt(retryAfter) : 5;
-                console.error(`🚨 LÍMITE DE SPOTIFY 429 🚨 - Estás temporalmente bloqueado por hacer muchas peticiones. Spotify exige esperar ${waitSecs} segundos antes de volver a intentarlo.`);
-                await new Promise(r => setTimeout(r, waitSecs * 1000));
+                console.error(`🚨 LÍMITE DE SPOTIFY 429 🚨 - Estás temporalmente bloqueado. Abortando peticiones de canciones para no empeorar el castigo. Spotify exige esperar ${waitSecs} segundos.`);
+                break; // <-- Romper el ciclo de inmediato para no congelar la página
             }
         } catch(e) {
             console.error("Error individual:", e);
