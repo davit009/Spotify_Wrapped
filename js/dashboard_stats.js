@@ -117,31 +117,24 @@ async function fetchTracksFromSpotify(ids, token) {
     const missingIds = ids.filter(id => !globalStats.spotifyCache[id]);
     if (missingIds.length === 0) return;
 
-    // Spotify permite hasta 50 IDs por petición
-    const chunkSize = 50;
-    const fetchPromises = [];
-
-    for (let i = 0; i < missingIds.length; i += chunkSize) {
-        const chunk = missingIds.slice(i, i + chunkSize);
-        const p = fetch(`https://api.spotify.com/v1/tracks?ids=${chunk.join(',')}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        }).then(async res => {
+    for (const id of missingIds) {
+        try {
+            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (res.ok) {
-                const data = await res.json();
-                data.tracks.forEach(t => {
-                    if (t) globalStats.spotifyCache[t.id] = t;
-                });
+                const trackData = await res.json();
+                globalStats.spotifyCache[trackData.id] = trackData;
             } else if (res.status === 401 || res.status === 400) {
-                console.warn("Token expirado al buscar chunk de tracks.");
+                console.warn(`Token de Spotify expirado al obtener track ${id}. Omitiendo.`);
             } else if (res.status === 429) {
-                console.warn("¡Límite de peticiones de Spotify alcanzado (429)! Omitiendo chunk.");
+                console.warn(`Límite de Spotify alcanzado al pedir track ${id}. Esperando 1 segundo...`);
+                await new Promise(r => setTimeout(r, 1000));
             }
-        }).catch(e => console.error("Error en batch fetch:", e));
-        
-        fetchPromises.push(p);
+        } catch(e) {
+            console.error("Error pidiendo track individual:", e);
+        }
     }
-    
-    await Promise.all(fetchPromises);
 }
 
 function renderRecentList(sessions, containerId = 'recent-tracks-list') {

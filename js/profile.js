@@ -401,7 +401,9 @@ async function renderStats(stats, spotifyToken, year = 'all') {
 
     // Top Artistas
     const artistMax = stats.topArtists[0]?.ms || 1;
-    const artistResults = await Promise.all(stats.topArtists.map(async (artist, i) => {
+    const artistResults = [];
+    for (let i = 0; i < stats.topArtists.length; i++) {
+        const artist = stats.topArtists[i];
         const h   = Math.floor(artist.ms / 3600000);
         const pct = Math.round((artist.ms / artistMax) * 100);
         let imgUrl = getCachedImage('artist_' + artist.name) || ARTIST_PLACEHOLDER;
@@ -420,7 +422,7 @@ async function renderStats(stats, spotifyToken, year = 'all') {
             } catch {}
         }
 
-        return { i, html: `
+        artistResults.push({ i, html: `
             <li class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
                 <span class="text-neutral-500 font-bold w-4 text-center text-sm flex-shrink-0">${i+1}</span>
                 <img src="${imgUrl}" class="track-img w-10 h-10 rounded-full object-cover shadow-md flex-shrink-0" onload="this.classList.add('loaded')">
@@ -429,8 +431,8 @@ async function renderStats(stats, spotifyToken, year = 'all') {
                     <div class="artist-bar"><div class="artist-bar-fill" data-pct="${pct}"></div></div>
                 </div>
                 <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-2 py-1 rounded-full flex-shrink-0">${h}h</span>
-            </li>` };
-    }));
+            </li>` });
+    }
 
     const artistList = document.getElementById('list-artists');
     document.getElementById('skeleton-artists').classList.add('hidden');
@@ -445,43 +447,50 @@ async function renderStats(stats, spotifyToken, year = 'all') {
     }, 100);
 
     // Top Canciones
-    const trackResults = await Promise.all(stats.topTracks.map(async (track, i) => {
+    const trackResults = [];
+    for (let i = 0; i < stats.topTracks.length; i++) {
+        const track = stats.topTracks[i];
         const m = Math.floor(track.ms / 60000);
         let imgUrl = getCachedImage('track_' + track.trackName + track.artistName) || TRACK_PLACEHOLDER;
-        let previewUrl = null;
         const needsFetch = imgUrl === TRACK_PLACEHOLDER;
+        let previewUrl = null, spotifyUrl = null;
 
         if (needsFetch && spotifyToken) {
             try {
-                const q = encodeURIComponent(`${track.trackName} ${track.artistName}`);
-                const r = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, { headers: { Authorization: `Bearer ${spotifyToken}` } });
+                const query = `${track.trackName} ${track.artistName}`;
+                const r = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, { headers: { Authorization: `Bearer ${spotifyToken}` } });
                 if (r.ok) {
                     const d = await r.json();
                     const t = d.tracks?.items[0];
-                    if (t?.album.images[0]?.url) {
-                        imgUrl = t.album.images[0].url;
-                        setCachedImage('track_' + track.trackName + track.artistName, imgUrl);
+                    if (t) {
+                        if (t.album?.images[0]?.url) {
+                            imgUrl = t.album.images[0].url;
+                            setCachedImage('track_' + track.trackName + track.artistName, imgUrl);
+                        }
+                        if (t.preview_url) previewUrl = t.preview_url;
+                        if (t.external_urls?.spotify) spotifyUrl = t.external_urls.spotify;
                     }
-                    previewUrl = t?.preview_url || null;
                 }
             } catch {}
         }
 
-        const hasPreview = previewUrl && previewUrl !== 'null';
-        return { i, html: `
-            <li class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
+        trackResults.push({ i, html: `
+            <li class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors group cursor-pointer"
+                data-preview="${previewUrl || ''}" data-spotify="${spotifyUrl || ''}">
                 <span class="text-neutral-500 font-bold w-4 text-center text-sm flex-shrink-0">${i+1}</span>
-                <div class="relative w-10 h-10 flex-shrink-0 ${hasPreview ? 'cursor-pointer group' : ''}" ${hasPreview ? `onclick="togglePlay('${previewUrl}',this)"` : ''}>
-                    <img src="${imgUrl}" class="track-img w-10 h-10 rounded-md object-cover shadow-md" onload="this.classList.add('loaded')">
-                    ${hasPreview ? `<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-md"><span class="text-white text-lg play-icon">▶</span></div>` : ''}
+                <div class="relative w-10 h-10 flex-shrink-0">
+                    <img src="${imgUrl}" class="track-img w-full h-full rounded shadow-md object-cover" onload="this.classList.add('loaded')">
+                    ${previewUrl ? `<div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>` : ''}
                 </div>
                 <div class="flex-1 overflow-hidden min-w-0">
                     <span class="font-bold text-white text-sm block truncate">${track.trackName}</span>
-                    <span class="text-xs text-neutral-400 truncate block">${track.artistName}</span>
+                    <span class="text-neutral-400 text-xs block truncate">${track.artistName}</span>
                 </div>
-                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-2 py-1 rounded-full flex-shrink-0">${m}m</span>
-            </li>` };
-    }));
+                <span class="text-xs font-bold text-[#1DB954] flex-shrink-0">${m}m</span>
+            </li>` });
+    }
 
     const trackList = document.getElementById('list-tracks');
     document.getElementById('skeleton-tracks').classList.add('hidden');
