@@ -114,20 +114,33 @@ function getTopTracks(sessionsArray, limit = 5) {
 }
 
 async function fetchTracksFromSpotify(ids, token) {
-    const fetchPromises = ids.filter(id => !globalStats.spotifyCache[id]).map(async (id) => {
-        try {
-            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+    const missingIds = ids.filter(id => !globalStats.spotifyCache[id]);
+    if (missingIds.length === 0) return;
+
+    // Spotify permite hasta 50 IDs por petición
+    const chunkSize = 50;
+    const fetchPromises = [];
+
+    for (let i = 0; i < missingIds.length; i += chunkSize) {
+        const chunk = missingIds.slice(i, i + chunkSize);
+        const p = fetch(`https://api.spotify.com/v1/tracks?ids=${chunk.join(',')}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).then(async res => {
             if (res.ok) {
-                const trackData = await res.json();
-                globalStats.spotifyCache[trackData.id] = trackData;
+                const data = await res.json();
+                data.tracks.forEach(t => {
+                    if (t) globalStats.spotifyCache[t.id] = t;
+                });
             } else if (res.status === 401 || res.status === 400) {
-                // Token expirado: loguear sin redirigir. El usuario refrescará sesión naturalmente.
-                console.warn(`Token de Spotify expirado al obtener track ${id}. Omitiendo.`);
+                console.warn("Token expirado al buscar chunk de tracks.");
+            } else if (res.status === 429) {
+                console.warn("¡Límite de peticiones de Spotify alcanzado (429)! Omitiendo chunk.");
             }
-        } catch(e) {}
-    });
+        }).catch(e => console.error("Error en batch fetch:", e));
+        
+        fetchPromises.push(p);
+    }
+    
     await Promise.all(fetchPromises);
 }
 
