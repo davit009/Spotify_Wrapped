@@ -5,9 +5,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    // Lógica de Logout
     document.getElementById('logout-btn').addEventListener('click', async () => {
         await supabaseClient.auth.signOut();
         window.location.href = 'index.html';
+    });
+
+    // Lógica de Modal de Configuración
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsModalContent = document.getElementById('settings-modal-content');
+    
+    document.getElementById('settings-btn').addEventListener('click', () => {
+        settingsModal.classList.remove('hidden');
+        setTimeout(() => {
+            settingsModalContent.classList.remove('scale-95', 'opacity-0');
+            settingsModalContent.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    });
+
+    document.getElementById('close-settings-btn').addEventListener('click', () => {
+        settingsModalContent.classList.remove('scale-100', 'opacity-100');
+        settingsModalContent.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => settingsModal.classList.add('hidden'), 150);
+    });
+
+    // Lógica de Guardado de Preferencia Toggle
+    document.getElementById('toggle-history').addEventListener('change', async (e) => {
+        const isChecked = e.target.checked;
+        await supabaseClient.from('users').update({ 
+            preferences: { merge_history: isChecked } 
+        }).eq('id', session.user.id);
+        
+        // Recargar stats para reflejar la mezcla al instante
+        checkSavedStats(session);
     });
 
     // Revisar si ya tiene estadísticas guardadas
@@ -47,6 +77,9 @@ async function checkSavedStats(session) {
         
         let stats = JSON.parse(JSON.stringify(data.historical_stats));
         const prefs = data.preferences || { merge_history: false };
+        
+        const toggleEl = document.getElementById('toggle-history');
+        if (toggleEl) toggleEl.checked = prefs.merge_history;
         
         if (prefs.merge_history) {
             // 1. Obtener sesiones recientes para mezclar
