@@ -63,6 +63,13 @@
                     // Si encontramos sesión, cancelamos cualquier redirección pendiente
                     if (redirectTimeout) clearTimeout(redirectTimeout);
                     
+                    // IMPORTANTE: Asegurar que el usuario exista físicamente en public.users 
+                    // para evitar errores de Foreign Key al guardar canciones.
+                    supabaseClient.from('users').upsert(
+                        { id: session.user.id }, 
+                        { onConflict: 'id', ignoreDuplicates: true }
+                    ).then(() => console.log("Usuario asegurado en BD."));
+
                     // Actualizar la interfaz con datos de Spotify
                     const userMeta = session.user.user_metadata;
                     document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';

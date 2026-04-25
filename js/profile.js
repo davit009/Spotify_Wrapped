@@ -102,11 +102,13 @@ async function processFiles(files, session) {
         topTracks: sortedTracks
     };
 
-    // Guardar en la base de datos
+    // Guardar en la base de datos (usamos upsert por si el registro no existía en public.users)
     const { error: saveError } = await supabaseClient
         .from('users')
-        .update({ historical_stats: statsObj })
-        .eq('id', session.user.id);
+        .upsert({ 
+            id: session.user.id, 
+            historical_stats: statsObj 
+        }, { onConflict: 'id' });
         
     if (saveError) console.error("Error al guardar en BD:", saveError);
 
