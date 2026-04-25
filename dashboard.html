@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpotiDuel - Dashboard</title>
+    <title>SpotiStats - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-[#121212] text-white min-h-screen p-6">
     <nav class="max-w-4xl mx-auto flex justify-between items-center mb-10 border-b border-neutral-800 pb-4">
-        <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Duel</span></h1>
-        <div class="flex items-center gap-4">
+        <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Stats</span></h1>
+        <div class="flex items-center gap-3">
+            <a href="profile.html" class="text-xs font-bold text-black bg-[#1DB954] hover:bg-[#1ed760] transition-colors px-3 py-1.5 rounded-full mr-2">Historia Musical</a>
             <!-- Info de usuario -->
             <img id="user-avatar" class="w-8 h-8 rounded-full hidden" alt="Avatar">
-            <span id="user-name" class="text-neutral-300 font-medium">Cargando...</span>
-            <button id="logout-btn" class="text-xs bg-neutral-800 hover:bg-neutral-700 px-3 py-1 rounded-md transition-colors">Salir</button>
+            <span id="user-name" class="text-neutral-300 font-medium hidden sm:inline">Cargando...</span>
+            <button id="logout-btn" class="text-xs bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 rounded-md transition-colors">Salir</button>
         </div>
     </nav>
 
