@@ -42,7 +42,7 @@ async function checkSavedStats(session) {
         .single();
         
     if (data && data.historical_stats) {
-        document.getElementById('dropzone').classList.add('hidden');
+        document.getElementById('upload-section').classList.add('hidden');
         renderStats(data.historical_stats, session);
     }
 }
@@ -103,12 +103,14 @@ async function processFiles(files, session) {
     };
 
     // Guardar en la base de datos
-    await supabaseClient
+    const { error: saveError } = await supabaseClient
         .from('users')
         .update({ historical_stats: statsObj })
         .eq('id', session.user.id);
+        
+    if (saveError) console.error("Error al guardar en BD:", saveError);
 
-    document.getElementById('dropzone').classList.add('hidden');
+    document.getElementById('upload-section').classList.add('hidden');
     renderStats(statsObj, session);
 }
 
@@ -128,62 +130,51 @@ async function renderStats(stats, session) {
     trackList.innerHTML = '<p class="text-neutral-500 text-center py-4 animate-pulse">Cargando portadas desde Spotify...</p>';
     artistList.innerHTML = '<p class="text-neutral-500 text-center py-4 animate-pulse">Buscando artistas...</p>';
 
-    // 1. Obtener datos de Spotify para Canciones
-    const validTrackIds = stats.topTracks.filter(t => t.uri && t.uri.includes('track:')).map(t => t.uri.split('track:')[1]);
-    
-    let spotifyTracks = {};
-    if (validTrackIds.length > 0) {
-        try {
-            const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${validTrackIds.join(',')}`, {
-                headers: { 'Authorization': `Bearer ${session.provider_token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                data.tracks.forEach(t => { if(t) spotifyTracks[t.id] = t; });
-            }
-        } catch (e) {}
-    }
-
+    // 1. Obtener datos de Spotify para Canciones (Búsqueda por nombre)
     trackList.innerHTML = '';
-    stats.topTracks.forEach((track, index) => {
+    const trackPromises = stats.topTracks.map(async (track, index) => {
         const m = Math.floor(track.ms / (1000 * 60));
         let imgUrl = 'https://via.placeholder.com/150/181818/1DB954?text=🎵';
         let previewUrl = null;
         
-        if (track.uri && track.uri.includes('track:')) {
-            const trackId = track.uri.split('track:')[1];
-            if (spotifyTracks[trackId]) {
-                const sTrack = spotifyTracks[trackId];
-                if (sTrack.album.images.length > 0) imgUrl = sTrack.album.images[0].url;
-                previewUrl = sTrack.preview_url;
+        try {
+            const query = `${track.trackName} ${track.artistName}`;
+            const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, {
+                headers: { 'Authorization': `Bearer ${session.provider_token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.tracks && data.tracks.items.length > 0) {
+                    const sTrack = data.tracks.items[0];
+                    if (sTrack.album.images.length > 0) imgUrl = sTrack.album.images[0].url;
+                    previewUrl = sTrack.preview_url;
+                }
             }
-        }
+        } catch (e) {}
 
-        const li = document.createElement('li');
-        li.className = "flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-colors border-b border-neutral-800/50 last:border-0";
-        
-        // Botón de Play / Portada
-        let playButtonHTML = `
-            <div class="relative w-12 h-12 flex-shrink-0 group ${previewUrl ? 'cursor-pointer' : ''}" onclick="togglePlay('${previewUrl}', this)">
-                <img src="${imgUrl}" class="w-12 h-12 rounded-md object-cover shadow-lg ${previewUrl ? 'group-hover:opacity-50 transition-opacity' : ''}">
-                ${previewUrl ? `
-                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span class="text-white text-2xl play-icon">▶</span>
-                    </div>
-                ` : ''}
-            </div>
-        `;
+        return { index, html: `
+            <li class="flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-colors border-b border-neutral-800/50 last:border-0">
+                <span class="text-neutral-500 font-bold w-4 text-center flex-shrink-0">${index + 1}</span>
+                <div class="relative w-12 h-12 flex-shrink-0 group ${previewUrl ? 'cursor-pointer' : ''}" onclick="togglePlay('${previewUrl}', this)">
+                    <img src="${imgUrl}" class="w-12 h-12 rounded-md object-cover shadow-lg ${previewUrl ? 'group-hover:opacity-50 transition-opacity' : ''}">
+                    ${previewUrl ? `
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span class="text-white text-2xl play-icon">▶</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="flex flex-col flex-1 overflow-hidden">
+                    <span class="font-bold text-white text-sm md:text-base truncate">${track.trackName}</span>
+                    <span class="text-xs text-neutral-400 truncate">${track.artistName}</span>
+                </div>
+                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full flex-shrink-0">${m}m</span>
+            </li>
+        `};
+    });
 
-        li.innerHTML = `
-            <span class="text-neutral-500 font-bold w-4 text-center flex-shrink-0">${index + 1}</span>
-            ${playButtonHTML}
-            <div class="flex flex-col flex-1 overflow-hidden">
-                <span class="font-bold text-white text-sm md:text-base truncate">${track.trackName}</span>
-                <span class="text-xs text-neutral-400 truncate">${track.artistName}</span>
-            </div>
-            <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full flex-shrink-0">${m}m</span>
-        `;
-        trackList.appendChild(li);
+    const trackResults = await Promise.all(trackPromises);
+    trackResults.sort((a, b) => a.index - b.index).forEach(res => {
+        trackList.innerHTML += res.html;
     });
 
     // 2. Obtener datos de Spotify para Artistas (Búsqueda en paralelo)
