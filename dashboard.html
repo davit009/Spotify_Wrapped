@@ -211,7 +211,13 @@
                     }
                     
                     loadStats(session.user.id);
-                    loadDynamicStats(session); // <--- Nueva función que carga los Tops
+                    // Sincronizar historial offline antes de cargar dinámicas
+                    if (typeof syncOfflineHistory === 'function') {
+                        syncOfflineHistory(session).then(() => loadDynamicStats(session));
+                    } else {
+                        loadDynamicStats(session);
+                    }
+                    
                     // Actualizar si tracking.js guarda una nueva canción
                     document.addEventListener('trackSaved', () => loadStats(session.user.id));
                 } else {

@@ -115,8 +115,63 @@ function showNowPlaying(track) {
 }
 
 function hideNowPlaying() {
-    const card = document.getElementById('now-playing-card');
-    if (card) card.classList.add('hidden');
+    document.getElementById('now-playing').classList.add('hidden');
+    currentTrackInfo = null; // Reseteamos si no hay nada
+}
+
+// Iniciar el rastreo cada 5 segundos
+setInterval(checkCurrentlyPlaying, 5000);
+
+// Novedad: Sincronización "Catch-Up" al abrir la app
+async function syncOfflineHistory(session) {
+    try {
+        const { data: userData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', session.user.id).single();
+        const token = userData?.spotify_access_token || session.provider_token;
+        if (!token) return;
+
+        // 1. Obtener la fecha de la última canción en Supabase
+        const { data: lastSession } = await supabaseClient
+            .from('listening_sessions')
+            .select('played_at')
+            .eq('user_id', session.user.id)
+            .order('played_at', { ascending: false })
+            .limit(1);
+
+        let afterTimestamp = 0;
+        if (lastSession && lastSession.length > 0) {
+            afterTimestamp = new Date(lastSession[0].played_at).getTime();
+        } else {
+            afterTimestamp = Date.now() - (24 * 60 * 60 * 1000); // Últimas 24h por defecto
+        }
+
+        // 2. Consultar Spotify (limitado a las canciones después de afterTimestamp)
+        const response = await fetch(`https://api.spotify.com/v1/me/player/recently-played?limit=50&after=${afterTimestamp}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        if (data.items && data.items.length > 0) {
+            const sessionsToInsert = data.items.map(item => ({
+                user_id: session.user.id,
+                track_id: item.track.id,
+                duration_ms: item.track.duration_ms,
+                played_at: item.played_at
+            }));
+
+            // 3. Insertar las faltantes
+            const { error } = await supabaseClient.from('listening_sessions')
+                .upsert(sessionsToInsert, { onConflict: 'user_id, played_at', ignoreDuplicates: true });
+            
+            if (!error) {
+                console.log(`¡Catch-Up exitoso! Se sincronizaron ${sessionsToInsert.length} canciones en offline.`);
+                document.dispatchEvent(new CustomEvent('trackSaved'));
+            }
+        }
+    } catch(e) {
+        console.error("Error en sync offline:", e);
+    }
 }
 
 // Iniciar polling cuando la página cargue
