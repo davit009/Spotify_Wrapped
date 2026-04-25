@@ -1,37 +1,154 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpotiStats - Tiempo de Música</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase CDN -->
+    <title>SpotiStats - Rastrea tu música</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #080808;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        /* Orbs animados de fondo */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.12;
+            animation: drift 10s ease-in-out infinite;
+            pointer-events: none;
+        }
+        .orb-1 { width: 600px; height: 600px; background: #1DB954; top: -150px; left: -150px; animation-delay: 0s; }
+        .orb-2 { width: 500px; height: 500px; background: #0d47a1; bottom: -150px; right: -100px; animation-delay: -5s; }
+        .orb-3 { width: 350px; height: 350px; background: #4a148c; top: 40%; left: 55%; animation-delay: -2.5s; }
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0); }
+            33%       { transform: translate(40px, -40px); }
+            66%       { transform: translate(-30px, 30px); }
+        }
+
+        /* Tarjeta principal */
+        .card {
+            position: relative;
+            z-index: 10;
+            background: rgba(18, 18, 18, 0.75);
+            backdrop-filter: blur(48px);
+            -webkit-backdrop-filter: blur(48px);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 28px;
+            padding: 52px 44px;
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            box-shadow: 0 0 100px rgba(29,185,84,0.07), 0 50px 100px rgba(0,0,0,0.6);
+            animation: cardIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Borde degradado sutil */
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 28px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(29,185,84,0.5) 0%, transparent 50%, rgba(29,185,84,0.15) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .logo { font-size: 2.6rem; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 6px; }
+        .logo span { color: #1DB954; }
+        .tagline { color: rgba(255,255,255,0.45); font-size: 0.88rem; line-height: 1.65; margin-bottom: 36px; }
+
+        /* Features */
+        .features { margin-bottom: 36px; text-align: left; }
+        .feat {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.83rem;
+            color: rgba(255,255,255,0.55);
+            animation: featIn 0.5s ease both;
+        }
+        .feat:last-child { border-bottom: none; }
+        .feat:nth-child(1) { animation-delay: 0.15s; }
+        .feat:nth-child(2) { animation-delay: 0.25s; }
+        .feat:nth-child(3) { animation-delay: 0.35s; }
+        .feat:nth-child(4) { animation-delay: 0.45s; }
+        @keyframes featIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .feat-dot { width: 7px; height: 7px; background: #1DB954; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 8px rgba(29,185,84,0.6); }
+
+        /* Botón login */
+        #login-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 11px;
+            background: #1DB954;
+            color: #000;
+            font-weight: 800;
+            font-size: 0.97rem;
+            padding: 17px 24px;
+            border-radius: 100px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            letter-spacing: 0.2px;
+        }
+        #login-btn:hover  { background: #1ed760; transform: scale(1.025); box-shadow: 0 10px 35px rgba(29,185,84,0.45); }
+        #login-btn:active { transform: scale(0.97); }
+
+        .footer-note { margin-top: 18px; font-size: 0.68rem; color: rgba(255,255,255,0.2); }
+    </style>
 </head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
 
-<body class="bg-[#121212] text-white min-h-screen flex flex-col items-center justify-center">
+    <div class="card">
+        <div class="logo">Spoti<span>Stats</span></div>
+        <p class="tagline">Descubre cuántas horas de tu vida has vivido con música.<br>En tiempo real y con historial completo.</p>
 
-    <div class="max-w-md w-full p-8 bg-[#181818] rounded-2xl shadow-2xl border border-neutral-800 text-center">
-        <h1 class="text-4xl font-bold mb-2">Spoti<span class="text-[#1DB954]">Stats</span></h1>
-        <p class="text-neutral-400 mb-8">Rastrea tus estadísticas de Spotify en tiempo real, guarda tu historial y compáralo.</p>
+        <div class="features">
+            <div class="feat"><div class="feat-dot"></div>Rastreo automático mientras escuchas</div>
+            <div class="feat"><div class="feat-dot"></div>Historial de vida importado desde Spotify</div>
+            <div class="feat"><div class="feat-dot"></div>Top artistas y canciones filtrados por año</div>
+            <div class="feat"><div class="feat-dot"></div>Todo guardado en la nube, siempre disponible</div>
+        </div>
 
-        <button id="login-btn"
-            class="w-full flex items-center justify-center gap-3 bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold py-3 px-6 rounded-full transition-all transform hover:scale-105">
-            <!-- Icono de Spotify -->
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path
-                    d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+        <button id="login-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
             </svg>
             Entrar con Spotify
         </button>
-
-        <p class="mt-4 text-xs text-neutral-500">Al iniciar sesión, aceptas trackear tu música de forma pasiva.</p>
+        <p class="footer-note">Al continuar aceptas el rastreo pasivo de tu actividad musical.</p>
     </div>
 
-    <!-- Scripts -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
 </body>
-
 </html>
