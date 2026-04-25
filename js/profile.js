@@ -1,21 +1,20 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-        window.location.href = 'index.html';
-        return;
-    }
+document.addEventListener('DOMContentLoaded', () => {
 
-    // Lógica de Logout
-    document.getElementById('logout-btn').addEventListener('click', async () => {
+    // =========================================================
+    // FASE 1: CONTROLES CRÍTICOS — montar de inmediato,
+    // SIN esperar a que la sesión cargue. Así el usuario
+    // siempre puede abrir Ajustes y cerrar sesión aunque
+    // los datos fallen o la auth se congele.
+    // =========================================================
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsModalContent = document.getElementById('settings-modal-content');
+
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
         await supabaseClient.auth.signOut();
         window.location.href = 'index.html';
     });
 
-    // Lógica de Modal de Configuración
-    const settingsModal = document.getElementById('settings-modal');
-    const settingsModalContent = document.getElementById('settings-modal-content');
-    
-    document.getElementById('settings-btn').addEventListener('click', () => {
+    document.getElementById('settings-btn')?.addEventListener('click', () => {
         settingsModal.classList.remove('hidden');
         setTimeout(() => {
             settingsModalContent.classList.remove('scale-95', 'opacity-0');
@@ -23,44 +22,71 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 10);
     });
 
-    document.getElementById('close-settings-btn').addEventListener('click', () => {
+    document.getElementById('close-settings-btn')?.addEventListener('click', () => {
         settingsModalContent.classList.remove('scale-100', 'opacity-100');
         settingsModalContent.classList.add('scale-95', 'opacity-0');
         setTimeout(() => settingsModal.classList.add('hidden'), 150);
     });
 
-    // Lógica de Guardado de Preferencia Toggle
-    document.getElementById('toggle-history').addEventListener('change', async (e) => {
-        const isChecked = e.target.checked;
-        await supabaseClient.from('users').update({ 
-            preferences: { merge_history: isChecked } 
-        }).eq('id', session.user.id);
-        
-        // Recargar stats para reflejar la mezcla al instante
-        checkSavedStats(session);
-    });
+    // =========================================================
+    // FASE 2: DATOS — esperar sesión confirmada para cargar
+    // estadísticas, dropzone y preferencias
+    // =========================================================
+    let redirectTimeout;
+    let dataInitialized = false;
 
-    // Revisar si ya tiene estadísticas guardadas
-    checkSavedStats(session);
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (session) {
+            if (redirectTimeout) clearTimeout(redirectTimeout);
 
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('file-upload');
+            // Evitar montar listeners duplicados si el evento dispara 2 veces
+            if (dataInitialized) return;
+            dataInitialized = true;
 
-    dropzone.addEventListener('click', (e) => {
-        if (e.target.id !== 'file-upload') fileInput.click();
-    });
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('border-[#1DB954]', 'bg-[#1DB954]/5');
-    });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5'));
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5');
-        if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files, session);
-    });
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) processFiles(e.target.files, session);
+            // Toggle de fusión de historial (requiere session.user.id)
+            document.getElementById('toggle-history')?.addEventListener('change', async (e) => {
+                await supabaseClient.from('users').update({
+                    preferences: { merge_history: e.target.checked }
+                }).eq('id', session.user.id);
+                checkSavedStats(session);
+            });
+
+            // Dropzone de archivos
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('file-upload');
+
+            dropzone?.addEventListener('click', (e) => {
+                if (e.target.id !== 'file-upload') fileInput.click();
+            });
+            dropzone?.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-[#1DB954]', 'bg-[#1DB954]/5');
+            });
+            dropzone?.addEventListener('dragleave', () =>
+                dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5')
+            );
+            dropzone?.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5');
+                if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files, session);
+            });
+            fileInput?.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) processFiles(e.target.files, session);
+            });
+
+            // Cargar estadísticas con sesión garantizada
+            checkSavedStats(session);
+
+        } else {
+            // Sin sesión activa: dar 2 segundos de gracia antes de redirigir
+            if (!dataInitialized) {
+                console.log('Sin sesión en profile. Esperando...');
+                redirectTimeout = setTimeout(() => {
+                    console.log('Sin sesión confirmada. Redirigiendo al login...');
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        }
     });
 });
 

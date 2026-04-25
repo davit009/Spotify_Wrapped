@@ -7,11 +7,18 @@ let globalStats = {
 
 async function loadDynamicStats(session) {
     const userId = session.user.id;
-    const token = session.provider_token;
+
+    // Leer token fresco de la BD (session.provider_token expira y no siempre está disponible)
+    const { data: uData } = await supabaseClient
+        .from('users')
+        .select('spotify_access_token')
+        .eq('id', userId)
+        .single();
+    const token = uData?.spotify_access_token || session.provider_token;
 
     if (!token) {
-        console.warn("Token ausente en la sesión. Re-autenticando con Spotify...");
-        await supabaseClient.auth.signInWithOAuth({ provider: 'spotify', options: { redirectTo: window.location.origin + '/dashboard.html' } });
+        console.warn("No hay token de Spotify disponible. El historial dinámico no cargará hasta la próxima sesión.");
+        document.getElementById('recent-tracks-list').innerHTML = '<p class="text-neutral-500 text-sm py-4">Inicia sesión nuevamente para ver el historial en tiempo real.</p>';
         return;
     }
 
@@ -77,22 +84,18 @@ function getTopTracks(sessionsArray, limit = 5) {
         .slice(0, limit);
 }
 
-let isReauthenticating = false;
 async function fetchTracksFromSpotify(ids, token) {
     const fetchPromises = ids.filter(id => !globalStats.spotifyCache[id]).map(async (id) => {
         try {
             const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if ((res.status === 401 || res.status === 400) && !isReauthenticating) {
-                isReauthenticating = true;
-                console.warn("Token expirado o inválido. Re-autenticando...");
-                await supabaseClient.auth.signInWithOAuth({ provider: 'spotify', options: { redirectTo: window.location.origin + '/dashboard.html' } });
-                return;
-            }
             if (res.ok) {
                 const trackData = await res.json();
                 globalStats.spotifyCache[trackData.id] = trackData;
+            } else if (res.status === 401 || res.status === 400) {
+                // Token expirado: loguear sin redirigir. El usuario refrescará sesión naturalmente.
+                console.warn(`Token de Spotify expirado al obtener track ${id}. Omitiendo.`);
             }
         } catch(e) {}
     });

@@ -18,17 +18,12 @@ async function checkCurrentlyPlaying() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        // Si el token de Spotify expiró (dura 1 hora), re-autenticamos automáticamente
+        // Si el token de Spotify expiró (dura 1 hora), parar el tracking silenciosamente
+        // NO redirigir: eso destruiría la sesión del usuario en medio de la navegación
         if ((response.status === 401 || response.status === 400) && !isReauthenticatingTracking) {
             isReauthenticatingTracking = true;
-            console.log("Token de Spotify expirado o inválido. Refrescando automáticamente...");
-            await supabaseClient.auth.signInWithOAuth({
-                provider: 'spotify',
-                options: {
-                    scopes: 'user-read-currently-playing user-read-recently-played user-read-email user-read-private',
-                    redirectTo: window.location.origin + '/dashboard.html'
-                }
-            });
+            console.warn("Token de Spotify expirado. El rastreo se pausará hasta la próxima sesión.");
+            hideNowPlaying();
             return;
         }
 
