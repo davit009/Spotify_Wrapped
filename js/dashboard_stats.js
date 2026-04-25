@@ -37,16 +37,20 @@ async function loadDynamicStats(session) {
         return;
     }
 
-    // 5. Consultar API de Spotify de un solo golpe
+    // 5. Consultar API de Spotify (uno por uno para evitar el error 403 de Multi-Get de Spotify 2024)
     let spotifyTracks = {};
     try {
-        const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${Array.from(idsToFetch).join(',')}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+        const fetchPromises = Array.from(idsToFetch).map(async (id) => {
+            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const trackData = await res.json();
+                spotifyTracks[trackData.id] = trackData;
+            }
         });
-        if (res.ok) {
-            const data = await res.json();
-            data.tracks.forEach(t => { if(t) spotifyTracks[t.id] = t; });
-        }
+        
+        await Promise.all(fetchPromises);
     } catch (e) {
         console.error("Error al obtener info de Spotify", e);
     }
