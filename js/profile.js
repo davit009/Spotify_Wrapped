@@ -1,165 +1,263 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    // Verificar si el usuario está logueado
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
         window.location.href = 'index.html';
         return;
     }
 
-    // Configurar Logout
     document.getElementById('logout-btn').addEventListener('click', async () => {
         await supabaseClient.auth.signOut();
         window.location.href = 'index.html';
     });
 
+    // Revisar si ya tiene estadísticas guardadas
+    checkSavedStats(session);
+
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-upload');
 
-    // Manejar clics y arrastrar/soltar en la zona de carga
     dropzone.addEventListener('click', (e) => {
-        // Evitar bucle infinito si el clic vino del input mismo
-        if (e.target.id !== 'file-upload') {
-            fileInput.click();
-        }
+        if (e.target.id !== 'file-upload') fileInput.click();
     });
-
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropzone.classList.add('border-[#1DB954]', 'bg-[#1DB954]/5');
     });
-
-    dropzone.addEventListener('dragleave', () => {
-        dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5');
-    });
-
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5'));
     dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropzone.classList.remove('border-[#1DB954]', 'bg-[#1DB954]/5');
-        if (e.dataTransfer.files.length > 0) {
-            processFiles(e.dataTransfer.files);
-        }
+        if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files, session);
     });
-
     fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            processFiles(e.target.files);
-        }
+        if (e.target.files.length > 0) processFiles(e.target.files, session);
     });
 });
 
-async function processFiles(files) {
-    let allData = [];
-    
-    // Cambiar UI temporalmente a estado de carga
-    document.getElementById('dropzone').querySelector('h3').textContent = 'Procesando historial...';
+async function checkSavedStats(session) {
+    const { data, error } = await supabaseClient
+        .from('users')
+        .select('historical_stats')
+        .eq('id', session.user.id)
+        .single();
+        
+    if (data && data.historical_stats) {
+        document.getElementById('dropzone').classList.add('hidden');
+        renderStats(data.historical_stats, session);
+    }
+}
 
-    // Leer todos los archivos JSON seleccionados
+async function processFiles(files, session) {
+    let allData = [];
+    document.getElementById('dropzone').querySelector('h3').textContent = 'Procesando y analizando datos...';
+
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.name.endsWith('.json')) {
             try {
                 const text = await file.text();
                 const json = JSON.parse(text);
-                if (Array.isArray(json)) {
-                    allData = allData.concat(json);
-                }
+                if (Array.isArray(json)) allData = allData.concat(json);
             } catch (err) {
-                console.error("Error leyendo archivo:", file.name, err);
+                console.error("Error leyendo", file.name);
             }
         }
     }
 
-    if (allData.length === 0) {
-        alert("No se encontraron datos válidos de Spotify en los archivos seleccionados.");
-        document.getElementById('dropzone').querySelector('h3').textContent = 'Selecciona o arrastra tus archivos JSON aquí';
-        return;
-    }
+    if (allData.length === 0) return;
 
-    analyzeData(allData);
-}
-
-function analyzeData(data) {
+    // Calcular estadísticas
     let totalMs = 0;
     const artistsCount = {};
     const tracksCount = {};
 
-    data.forEach(item => {
-        // Spotify proporciona diferentes campos según si es el historial Standard o Extended.
-        // Standard usa 'msPlayed', 'artistName', 'trackName'.
-        // Extended usa 'ms_played', 'master_metadata_album_artist_name', 'master_metadata_track_name'.
+    allData.forEach(item => {
         const ms = item.ms_played || item.msPlayed || 0;
         const artist = item.master_metadata_album_artist_name || item.artistName;
         const track = item.master_metadata_track_name || item.trackName;
+        const uri = item.spotify_track_uri;
 
-        // Regla: Solo contar si se escuchó al menos 30 segundos
-        if (ms < 30000) return;
+        if (ms < 30000 || !artist || !track) return;
 
         totalMs += ms;
-
-        if (artist) {
-            artistsCount[artist] = (artistsCount[artist] || 0) + ms;
-        }
-
-        if (track && artist) {
-            const trackKey = `${track} - ${artist}`;
-            tracksCount[trackKey] = (tracksCount[trackKey] || 0) + ms;
-        }
-    });
-
-    // Cálculos de horas y formateo
-    const hours = Math.floor(totalMs / (1000 * 60 * 60));
-    
-    // Ordenar los mejores 10 artistas y canciones
-    const sortedArtists = Object.entries(artistsCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+        artistsCount[artist] = (artistsCount[artist] || 0) + ms;
         
-    const sortedTracks = Object.entries(tracksCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
-
-    // Plasmar datos en el HTML
-    document.getElementById('stat-hours').textContent = `${hours}h`;
-    document.getElementById('stat-artists').textContent = Object.keys(artistsCount).length.toLocaleString();
-    document.getElementById('stat-tracks').textContent = Object.keys(tracksCount).length.toLocaleString();
-
-    // Llenar lista de Artistas
-    const artistList = document.getElementById('list-artists');
-    artistList.innerHTML = '';
-    sortedArtists.forEach(([name, ms], index) => {
-        const h = Math.floor(ms / (1000 * 60 * 60));
-        artistList.innerHTML += `
-            <li class="flex justify-between items-center p-2 hover:bg-white/5 rounded-lg transition-colors border-b border-neutral-800/50 last:border-0">
-                <div class="flex items-center gap-4">
-                    <span class="text-neutral-500 font-bold w-4 text-center">${index + 1}</span>
-                    <span class="font-bold text-white text-sm md:text-base">${name}</span>
-                </div>
-                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full">${h}h</span>
-            </li>
-        `;
+        // Guardamos el URI de spotify si existe para poder buscar la foto luego
+        const trackKey = `${track} - ${artist}`;
+        if (!tracksCount[trackKey]) {
+            tracksCount[trackKey] = { ms: 0, uri: uri, trackName: track, artistName: artist };
+        }
+        tracksCount[trackKey].ms += ms;
     });
 
-    // Llenar lista de Canciones
-    const trackList = document.getElementById('list-tracks');
-    trackList.innerHTML = '';
-    sortedTracks.forEach(([name, ms], index) => {
-        const m = Math.floor(ms / (1000 * 60));
-        const [trackName, artistName] = name.split(' - ');
-        trackList.innerHTML += `
-            <li class="flex justify-between items-center p-2 hover:bg-white/5 rounded-lg transition-colors border-b border-neutral-800/50 last:border-0">
-                <div class="flex items-center gap-4 overflow-hidden pr-2">
-                    <span class="text-neutral-500 font-bold w-4 text-center flex-shrink-0">${index + 1}</span>
-                    <div class="flex flex-col overflow-hidden">
-                        <span class="font-bold text-white text-sm md:text-base truncate">${trackName}</span>
-                        <span class="text-xs text-neutral-400 truncate">${artistName}</span>
-                    </div>
-                </div>
-                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full flex-shrink-0">${m}m</span>
-            </li>
-        `;
-    });
+    const hours = Math.floor(totalMs / (1000 * 60 * 60));
+    const sortedArtists = Object.entries(artistsCount).sort((a, b) => b[1] - a[1]).slice(0, 10).map(x => ({ name: x[0], ms: x[1] }));
+    const sortedTracks = Object.values(tracksCount).sort((a, b) => b.ms - a.ms).slice(0, 10);
 
-    // Mostrar sección de resultados
+    const statsObj = {
+        hours,
+        totalUniqueArtists: Object.keys(artistsCount).length,
+        totalUniqueTracks: Object.keys(tracksCount).length,
+        topArtists: sortedArtists,
+        topTracks: sortedTracks
+    };
+
+    // Guardar en la base de datos
+    await supabaseClient
+        .from('users')
+        .update({ historical_stats: statsObj })
+        .eq('id', session.user.id);
+
     document.getElementById('dropzone').classList.add('hidden');
-    document.getElementById('results').classList.remove('hidden');
+    renderStats(statsObj, session);
 }
+
+// Variables para reproducir música
+let currentAudio = null;
+let currentPlayingBtn = null;
+
+async function renderStats(stats, session) {
+    document.getElementById('stat-hours').textContent = `${stats.hours}h`;
+    document.getElementById('stat-artists').textContent = stats.totalUniqueArtists.toLocaleString();
+    document.getElementById('stat-tracks').textContent = stats.totalUniqueTracks.toLocaleString();
+
+    document.getElementById('results').classList.remove('hidden');
+
+    const trackList = document.getElementById('list-tracks');
+    const artistList = document.getElementById('list-artists');
+    trackList.innerHTML = '<p class="text-neutral-500 text-center py-4 animate-pulse">Cargando portadas desde Spotify...</p>';
+    artistList.innerHTML = '<p class="text-neutral-500 text-center py-4 animate-pulse">Buscando artistas...</p>';
+
+    // 1. Obtener datos de Spotify para Canciones
+    const validTrackIds = stats.topTracks.filter(t => t.uri && t.uri.includes('track:')).map(t => t.uri.split('track:')[1]);
+    
+    let spotifyTracks = {};
+    if (validTrackIds.length > 0) {
+        try {
+            const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${validTrackIds.join(',')}`, {
+                headers: { 'Authorization': `Bearer ${session.provider_token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                data.tracks.forEach(t => { if(t) spotifyTracks[t.id] = t; });
+            }
+        } catch (e) {}
+    }
+
+    trackList.innerHTML = '';
+    stats.topTracks.forEach((track, index) => {
+        const m = Math.floor(track.ms / (1000 * 60));
+        let imgUrl = 'https://via.placeholder.com/150/181818/1DB954?text=🎵';
+        let previewUrl = null;
+        
+        if (track.uri && track.uri.includes('track:')) {
+            const trackId = track.uri.split('track:')[1];
+            if (spotifyTracks[trackId]) {
+                const sTrack = spotifyTracks[trackId];
+                if (sTrack.album.images.length > 0) imgUrl = sTrack.album.images[0].url;
+                previewUrl = sTrack.preview_url;
+            }
+        }
+
+        const li = document.createElement('li');
+        li.className = "flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-colors border-b border-neutral-800/50 last:border-0";
+        
+        // Botón de Play / Portada
+        let playButtonHTML = `
+            <div class="relative w-12 h-12 flex-shrink-0 group ${previewUrl ? 'cursor-pointer' : ''}" onclick="togglePlay('${previewUrl}', this)">
+                <img src="${imgUrl}" class="w-12 h-12 rounded-md object-cover shadow-lg ${previewUrl ? 'group-hover:opacity-50 transition-opacity' : ''}">
+                ${previewUrl ? `
+                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span class="text-white text-2xl play-icon">▶</span>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        li.innerHTML = `
+            <span class="text-neutral-500 font-bold w-4 text-center flex-shrink-0">${index + 1}</span>
+            ${playButtonHTML}
+            <div class="flex flex-col flex-1 overflow-hidden">
+                <span class="font-bold text-white text-sm md:text-base truncate">${track.trackName}</span>
+                <span class="text-xs text-neutral-400 truncate">${track.artistName}</span>
+            </div>
+            <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full flex-shrink-0">${m}m</span>
+        `;
+        trackList.appendChild(li);
+    });
+
+    // 2. Obtener datos de Spotify para Artistas (Búsqueda en paralelo)
+    artistList.innerHTML = '';
+    
+    // Promesas para buscar artistas
+    const artistPromises = stats.topArtists.map(async (artist, index) => {
+        const h = Math.floor(artist.ms / (1000 * 60 * 60));
+        let imgUrl = 'https://via.placeholder.com/150/181818/1DB954?text=🎙️';
+        
+        try {
+            const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(artist.name)}&type=artist&limit=1`, {
+                headers: { 'Authorization': `Bearer ${session.provider_token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.artists.items.length > 0 && data.artists.items[0].images.length > 0) {
+                    imgUrl = data.artists.items[0].images[0].url;
+                }
+            }
+        } catch (e) {}
+
+        return { index, html: `
+            <li class="flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-colors border-b border-neutral-800/50 last:border-0">
+                <span class="text-neutral-500 font-bold w-4 text-center flex-shrink-0">${index + 1}</span>
+                <img src="${imgUrl}" class="w-12 h-12 rounded-full object-cover shadow-lg flex-shrink-0">
+                <span class="font-bold text-white text-sm md:text-base flex-1 truncate">${artist.name}</span>
+                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full flex-shrink-0">${h}h</span>
+            </li>
+        `};
+    });
+
+    // Esperar a que todos terminen y dibujarlos en orden
+    const artistResults = await Promise.all(artistPromises);
+    artistResults.sort((a, b) => a.index - b.index).forEach(res => {
+        artistList.innerHTML += res.html;
+    });
+}
+
+// Reproductor de Previas
+window.togglePlay = function(previewUrl, containerElement) {
+    if (!previewUrl || previewUrl === 'null') return;
+
+    const iconElement = containerElement.querySelector('.play-icon');
+
+    // Si ya está sonando este mismo audio, pausarlo
+    if (currentAudio && currentAudio.src === previewUrl) {
+        if (!currentAudio.paused) {
+            currentAudio.pause();
+            iconElement.textContent = '▶';
+            return;
+        } else {
+            currentAudio.play();
+            iconElement.textContent = '⏸';
+            return;
+        }
+    }
+
+    // Detener audio anterior si existe
+    if (currentAudio) {
+        currentAudio.pause();
+        if (currentPlayingBtn) currentPlayingBtn.textContent = '▶';
+    }
+
+    // Iniciar nuevo audio
+    currentAudio = new Audio(previewUrl);
+    currentAudio.volume = 0.5;
+    currentAudio.play();
+    
+    iconElement.textContent = '⏸';
+    currentPlayingBtn = iconElement;
+
+    // Al terminar de sonar
+    currentAudio.onended = () => {
+        iconElement.textContent = '▶';
+    };
+};
