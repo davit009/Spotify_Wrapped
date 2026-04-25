@@ -49,11 +49,14 @@
             </div>
 
             <!-- Últimas 5 Escuchadas -->
-            <div class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl">
-                <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-white">
-                    <svg class="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Historial Reciente
-                </h3>
+            <div id="recent-history-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-neutral-600 hover:bg-[#1a1a1a] transition-all group">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold flex items-center gap-2 text-white">
+                        <svg class="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Historial Reciente
+                    </h3>
+                    <span class="text-xs text-neutral-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Ver completo &rarr;</span>
+                </div>
                 <div id="recent-tracks-list" class="flex flex-col">
                     <div class="animate-pulse flex space-x-4 p-3">
                         <div class="rounded-md bg-neutral-800 h-10 w-10"></div>
@@ -76,18 +79,24 @@
             </div>
 
             <!-- Top Día -->
-            <div class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl">
+            <div id="top-today-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-[#1DB954]/50 hover:-translate-y-1 transition-all group relative">
                 <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🔥 Tu obsesión de hoy</h3>
                 <div id="card-top-today" class="min-h-[72px]">
                     <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
                 </div>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-neutral-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </div>
             </div>
 
             <!-- Top Semana -->
-            <div class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl">
+            <div id="top-week-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-[#1DB954]/50 hover:-translate-y-1 transition-all group relative">
                 <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🏆 Rey de la semana</h3>
                 <div id="card-top-week" class="min-h-[72px]">
                     <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
+                </div>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-neutral-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </div>
             </div>
 
@@ -101,6 +110,7 @@
 
     <!-- Modal de Configuraciones -->
     <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <!-- ... content remains the same, we just insert the next modal right after ... -->
         <div class="bg-[#181818] p-8 rounded-2xl border border-neutral-800 w-full max-w-md shadow-2xl mx-4 transform transition-all scale-95 opacity-0" id="settings-modal-content">
             <h2 class="text-2xl font-bold mb-6 text-white flex items-center gap-2">
                 <svg class="w-6 h-6 text-[#1DB954]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -127,6 +137,24 @@
                     Cerrar Sesión
                 </button>
                 <button id="close-settings-btn" class="bg-white text-black font-bold py-2 px-6 rounded-full hover:scale-105 transition-transform text-sm">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dinámico de Listas (Historial / Tops) -->
+    <div id="list-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#181818] p-6 sm:p-8 rounded-2xl border border-neutral-800 w-full max-w-lg shadow-2xl transform transition-all scale-95 opacity-0 flex flex-col max-h-[85vh]" id="list-modal-content">
+            <div class="flex justify-between items-start mb-6 shrink-0">
+                <h2 id="list-modal-title" class="text-2xl font-black text-white text-[#1DB954]">Título</h2>
+                <button id="close-list-modal" class="text-neutral-500 hover:text-white transition-colors bg-neutral-800/50 hover:bg-neutral-800 p-2 rounded-full">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <p id="list-modal-subtitle" class="text-neutral-400 text-sm mb-4 shrink-0 hidden">Subtítulo</p>
+
+            <div id="list-modal-body" class="overflow-y-auto pr-2 space-y-3 flex-1 flex flex-col custom-scrollbar">
+                <!-- Se inyectan los items desde JS -->
             </div>
         </div>
     </div>
