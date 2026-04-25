@@ -8,19 +8,36 @@ let globalStats = {
 async function loadDynamicStats(session) {
     const userId = session.user.id;
 
-    // Leer token fresco de la BD (session.provider_token expira y no siempre está disponible)
-    const { data: uData } = await supabaseClient
-        .from('users')
-        .select('spotify_access_token')
-        .eq('id', userId)
-        .single();
-    const token = uData?.spotify_access_token || session.provider_token;
+    // Intentar token de sesión primero (disponible justo tras OAuth, sin necesitar BD)
+    let token = session.provider_token || null;
+
+    // Si no hay token en sesión, intentar leerlo de la BD una sola vez
+    if (!token) {
+        try {
+            const { data: uData, error: tokenError } = await supabaseClient
+                .from('users')
+                .select('spotify_access_token')
+                .eq('id', userId)
+                .single();
+
+            if (tokenError) {
+                console.warn('No se pudo leer el token de Spotify de la BD:', tokenError.message,
+                    '\n→ Si ves errores 400, ejecuta la migración SQL de Supabase primero.');
+            } else {
+                token = uData?.spotify_access_token || null;
+            }
+        } catch (e) {
+            console.warn('Error de red al leer token:', e.message);
+        }
+    }
 
     if (!token) {
-        console.warn("No hay token de Spotify disponible. El historial dinámico no cargará hasta la próxima sesión.");
-        document.getElementById('recent-tracks-list').innerHTML = '<p class="text-neutral-500 text-sm py-4">Inicia sesión nuevamente para ver el historial en tiempo real.</p>';
+        console.warn('No hay token de Spotify disponible. El historial dinámico requiere iniciar sesión nuevamente.');
+        document.getElementById('recent-tracks-list').innerHTML =
+            '<p class="text-neutral-500 text-sm py-4">Inicia sesión nuevamente para ver el historial en tiempo real.</p>';
         return;
     }
+
 
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);

@@ -6,10 +6,16 @@ async function checkCurrentlyPlaying() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
 
-    // Recuperar token real de BD (fresco)
-    const { data: userData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', session.user.id).single();
-    const token = userData?.spotify_access_token || session.provider_token;
-    
+    // Intentar token de sesión primero, luego la BD
+    let token = session.provider_token || null;
+    if (!token) {
+        try {
+            const { data: userData, error: tokenErr } = await supabaseClient
+                .from('users').select('spotify_access_token').eq('id', session.user.id).single();
+            if (!tokenErr) token = userData?.spotify_access_token || null;
+        } catch (e) { /* red sin disponibilidad, silencioso */ }
+    }
+
     if (!token) return;
 
     try {
