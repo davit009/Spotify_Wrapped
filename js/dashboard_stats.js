@@ -77,6 +77,11 @@ async function fetchTracksFromSpotify(ids, token) {
             const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            if (res.status === 401) {
+                console.warn("Token expirado en loadDynamicStats. Re-autenticando...");
+                await supabaseClient.auth.signInWithOAuth({ provider: 'spotify', options: { redirectTo: window.location.origin + '/dashboard.html' } });
+                return;
+            }
             if (res.ok) {
                 const trackData = await res.json();
                 globalStats.spotifyCache[trackData.id] = trackData;

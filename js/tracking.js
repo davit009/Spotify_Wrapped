@@ -1,16 +1,20 @@
 let currentTrackInfo = null;
 
 async function checkCurrentlyPlaying() {
-    // Obtenemos la sesión para conseguir el token de Spotify
+    // Obtenemos la sesión
     const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    // Recuperar token real de BD (fresco)
+    const { data: userData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', session.user.id).single();
+    const token = userData?.spotify_access_token || session.provider_token;
     
-    // Si no hay sesión o falta el token de Spotify, no hacemos nada
-    if (!session || !session.provider_token) return;
+    if (!token) return;
 
     try {
         // Consultar a Spotify qué se está reproduciendo ahora mismo
         const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-            headers: { 'Authorization': `Bearer ${session.provider_token}` }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         // Si el token de Spotify expiró (dura 1 hora), re-autenticamos automáticamente

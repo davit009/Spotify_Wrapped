@@ -166,7 +166,7 @@
             let redirectTimeout;
             
             // Escuchar cambios de estado de autenticación (más seguro para redirecciones OAuth)
-            supabaseClient.auth.onAuthStateChange((event, session) => {
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 console.log("Auth event:", event, "Session:", session);
                 
                 if (session) {
@@ -175,14 +175,22 @@
                     
                     // IMPORTANTE: Asegurar que el usuario exista físicamente en public.users 
                     // Y guardar su token de refresco para el tracking automático (Fase 3)
-                    if (session.provider_refresh_token) {
-                        supabaseClient.from('users').upsert(
-                            { 
-                                id: session.user.id,
-                                spotify_refresh_token: session.provider_refresh_token
-                            }, 
-                            { onConflict: 'id' }
-                        ).then(() => console.log("Usuario y Refresh Token asegurados en BD."));
+                    let updatePayload = { id: session.user.id };
+                    if (session.provider_refresh_token) updatePayload.spotify_refresh_token = session.provider_refresh_token;
+                    if (session.provider_token) updatePayload.spotify_access_token = session.provider_token;
+                    
+                    await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id' })
+                        .then(() => console.log("Usuario y Tokens asegurados en BD."));
+
+                    // Recuperar el token más fresco de la BD (por si el background job lo actualizó o Supabase lo omitió del getSession)
+                    const { data: userData } = await supabaseClient
+                        .from('users')
+                        .select('spotify_access_token')
+                        .eq('id', session.user.id)
+                        .single();
+                        
+                    if (userData && userData.spotify_access_token) {
+                        session.provider_token = userData.spotify_access_token;
                     }
 
                     // Actualizar la interfaz con datos de Spotify

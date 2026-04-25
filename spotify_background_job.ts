@@ -5,7 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SPOTIFY_CLIENT_ID = Deno.env.get('SPOTIFY_CLIENT_ID') || '';
 const SPOTIFY_CLIENT_SECRET = Deno.env.get('SPOTIFY_CLIENT_SECRET') || '';
 
-serve(async (req) => {
+serve(async (req: Request) => {
     try {
         // 1. Iniciar conexión administrativa a Supabase
         const supabaseAdmin = createClient(
@@ -48,6 +48,13 @@ serve(async (req) => {
             }
 
             const accessToken = tokenData.access_token;
+            
+            // Guardar el nuevo token en la BD para que el frontend pueda usarlo
+            const updatePayload: any = { spotify_access_token: accessToken };
+            if (tokenData.refresh_token) {
+                updatePayload.spotify_refresh_token = tokenData.refresh_token;
+            }
+            await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
 
             // B. Pedir el historial de canciones a Spotify (últimas 50)
             const historyResponse = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
