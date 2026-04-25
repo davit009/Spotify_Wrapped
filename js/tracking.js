@@ -1,5 +1,6 @@
 let currentTrackInfo = null;
 
+let isReauthenticatingTracking = false;
 async function checkCurrentlyPlaying() {
     // Obtenemos la sesión
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -18,8 +19,9 @@ async function checkCurrentlyPlaying() {
         });
 
         // Si el token de Spotify expiró (dura 1 hora), re-autenticamos automáticamente
-        if (response.status === 401) {
-            console.log("Token de Spotify expirado. Refrescando automáticamente...");
+        if ((response.status === 401 || response.status === 400) && !isReauthenticatingTracking) {
+            isReauthenticatingTracking = true;
+            console.log("Token de Spotify expirado o inválido. Refrescando automáticamente...");
             await supabaseClient.auth.signInWithOAuth({
                 provider: 'spotify',
                 options: {

@@ -9,6 +9,12 @@ async function loadDynamicStats(session) {
     const userId = session.user.id;
     const token = session.provider_token;
 
+    if (!token) {
+        console.warn("Token ausente en la sesión. Re-autenticando con Spotify...");
+        await supabaseClient.auth.signInWithOAuth({ provider: 'spotify', options: { redirectTo: window.location.origin + '/dashboard.html' } });
+        return;
+    }
+
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     
@@ -71,14 +77,16 @@ function getTopTracks(sessionsArray, limit = 5) {
         .slice(0, limit);
 }
 
+let isReauthenticating = false;
 async function fetchTracksFromSpotify(ids, token) {
     const fetchPromises = ids.filter(id => !globalStats.spotifyCache[id]).map(async (id) => {
         try {
             const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (res.status === 401) {
-                console.warn("Token expirado en loadDynamicStats. Re-autenticando...");
+            if ((res.status === 401 || res.status === 400) && !isReauthenticating) {
+                isReauthenticating = true;
+                console.warn("Token expirado o inválido. Re-autenticando...");
                 await supabaseClient.auth.signInWithOAuth({ provider: 'spotify', options: { redirectTo: window.location.origin + '/dashboard.html' } });
                 return;
             }

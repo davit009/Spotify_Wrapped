@@ -176,11 +176,18 @@
                     // IMPORTANTE: Asegurar que el usuario exista físicamente en public.users 
                     // Y guardar su token de refresco para el tracking automático (Fase 3)
                     let updatePayload = { id: session.user.id };
-                    if (session.provider_refresh_token) updatePayload.spotify_refresh_token = session.provider_refresh_token;
-                    if (session.provider_token) updatePayload.spotify_access_token = session.provider_token;
+                    let hasNewTokens = false;
+                    if (session.provider_refresh_token) { updatePayload.spotify_refresh_token = session.provider_refresh_token; hasNewTokens = true; }
+                    if (session.provider_token) { updatePayload.spotify_access_token = session.provider_token; hasNewTokens = true; }
                     
-                    await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id' })
-                        .then(() => console.log("Usuario y Tokens asegurados en BD."));
+                    if (hasNewTokens) {
+                        try {
+                            await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id' });
+                            console.log("Usuario y Tokens asegurados en BD.");
+                        } catch (err) {
+                            console.error("Error al hacer upsert de tokens:", err);
+                        }
+                    }
 
                     // Recuperar el token más fresco de la BD (por si el background job lo actualizó o Supabase lo omitió del getSession)
                     const { data: userData } = await supabaseClient
