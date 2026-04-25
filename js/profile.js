@@ -16,7 +16,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const fileInput = document.getElementById('file-upload');
 
     // Manejar clics y arrastrar/soltar en la zona de carga
-    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('click', (e) => {
+        // Evitar bucle infinito si el clic vino del input mismo
+        if (e.target.id !== 'file-upload') {
+            fileInput.click();
+        }
+    });
 
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
