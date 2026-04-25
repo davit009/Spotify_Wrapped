@@ -13,6 +13,19 @@ async function checkCurrentlyPlaying() {
             headers: { 'Authorization': `Bearer ${session.provider_token}` }
         });
 
+        // Si el token de Spotify expiró (dura 1 hora), re-autenticamos automáticamente
+        if (response.status === 401) {
+            console.log("Token de Spotify expirado. Refrescando automáticamente...");
+            await supabaseClient.auth.signInWithOAuth({
+                provider: 'spotify',
+                options: {
+                    scopes: 'user-read-currently-playing user-read-recently-played user-read-email user-read-private',
+                    redirectTo: window.location.origin + '/dashboard.html'
+                }
+            });
+            return;
+        }
+
         // 204 significa que Spotify está pausado o apagado
         if (response.status === 204 || response.status > 400) {
             hideNowPlaying();
