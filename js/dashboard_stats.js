@@ -33,8 +33,10 @@ async function loadDynamicStats(session) {
 
     if (!token) {
         console.warn('No hay token de Spotify disponible. El historial dinámico requiere iniciar sesión nuevamente.');
-        document.getElementById('recent-tracks-list').innerHTML =
-            '<p class="text-neutral-500 text-sm py-4">Inicia sesión nuevamente para ver el historial en tiempo real.</p>';
+        const msg = '<p class="text-neutral-500 text-sm py-4">Inicia sesión nuevamente para ver esta información.</p>';
+        document.getElementById('recent-tracks-list').innerHTML = msg;
+        document.getElementById('card-top-today').innerHTML = msg;
+        document.getElementById('card-top-week').innerHTML = msg;
         return;
     }
 

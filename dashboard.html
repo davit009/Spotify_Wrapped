@@ -96,7 +96,7 @@
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold flex items-center gap-2 text-white">
                         <svg class="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Historial Reciente
+                        Últimas escuchadas
                     </h3>
                     <span class="text-xs text-neutral-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Ver completo &rarr;</span>
                 </div>
@@ -123,7 +123,7 @@
 
             <!-- Top Día -->
             <div id="top-today-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-[#1DB954]/50 hover:-translate-y-1 transition-all group relative">
-                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🔥 Tu obsesión de hoy</h3>
+                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🔥 Más escuchada (Hoy)</h3>
                 <div id="card-top-today" class="min-h-[72px]">
                     <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
                 </div>
@@ -134,7 +134,7 @@
 
             <!-- Top Semana -->
             <div id="top-week-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-[#1DB954]/50 hover:-translate-y-1 transition-all group relative">
-                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🏆 Rey de la semana</h3>
+                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🏆 Más escuchada (Semana)</h3>
                 <div id="card-top-week" class="min-h-[72px]">
                     <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
                 </div>
@@ -220,7 +220,7 @@
                 if (session.provider_refresh_token) { updatePayload.spotify_refresh_token = session.provider_refresh_token; hasNewTokens = true; }
                 if (session.provider_token)         { updatePayload.spotify_access_token  = session.provider_token;         hasNewTokens = true; }
                 if (hasNewTokens) {
-                    try { await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id' }); }
+                    try { await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id', defaultToNull: false }); }
                     catch (err) { console.error('Error guardando tokens:', err); }
                 }
 

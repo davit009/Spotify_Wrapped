@@ -326,7 +326,8 @@ async function processFiles(files, _closureSession) {
 
     const { error: saveError } = await supabaseClient
         .from('users')
-        .upsert({ id: session.user.id, historical_stats: statsToSave }, { onConflict: 'id' });
+        .update({ historical_stats: statsToSave })
+        .eq('id', session.user.id);
 
     if (saveError) {
         console.error('❌ Error al guardar en Supabase:', JSON.stringify(saveError));
