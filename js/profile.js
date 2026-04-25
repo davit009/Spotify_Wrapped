@@ -419,6 +419,8 @@ async function renderStats(stats, spotifyToken, year = 'all') {
                         setCachedImage('artist_' + artist.name, imgUrl);
                     }
                 }
+                // Retraso de 100ms para evitar Error 429 de Spotify (Too Many Requests)
+                await new Promise(resolve => setTimeout(resolve, 100));
             } catch {}
         }
 
@@ -471,6 +473,8 @@ async function renderStats(stats, spotifyToken, year = 'all') {
                         if (t.external_urls?.spotify) spotifyUrl = t.external_urls.spotify;
                     }
                 }
+                // Retraso de 100ms para evitar Error 429 de Spotify (Too Many Requests)
+                await new Promise(resolve => setTimeout(resolve, 100));
             } catch {}
         }
 
