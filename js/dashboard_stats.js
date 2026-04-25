@@ -140,8 +140,10 @@ async function fetchTracksFromSpotify(ids, token) {
             } else if (res.status === 401 || res.status === 400) {
                 console.warn(`Token expirado al pedir track ${id}.`);
             } else if (res.status === 429) {
-                console.warn(`Límite 429 alcanzado para track ${id}. Esperando 1 segundo...`);
-                await new Promise(r => setTimeout(r, 1000));
+                const retryAfter = res.headers.get('Retry-After');
+                const waitSecs = retryAfter ? parseInt(retryAfter) : 5;
+                console.error(`🚨 LÍMITE DE SPOTIFY 429 🚨 - Estás temporalmente bloqueado por hacer muchas peticiones. Spotify exige esperar ${waitSecs} segundos antes de volver a intentarlo.`);
+                await new Promise(r => setTimeout(r, waitSecs * 1000));
             }
         } catch(e) {
             console.error("Error individual:", e);
