@@ -2,7 +2,7 @@ let currentTrackInfo = null;
 
 async function checkCurrentlyPlaying() {
     // Obtenemos la sesión para conseguir el token de Spotify
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     
     // Si no hay sesión o falta el token de Spotify, no hacemos nada
     if (!session || !session.provider_token) return;
@@ -55,7 +55,7 @@ async function checkCurrentlyPlaying() {
 async function saveTrackToDB(trackInfo, userId) {
     const playedAt = new Date().toISOString();
     
-    const { error } = await window.supabaseClient
+    const { error } = await supabaseClient
         .from('listening_sessions')
         .insert({
             user_id: userId,

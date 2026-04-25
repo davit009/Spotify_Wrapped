@@ -99,7 +99,7 @@
         });
 
         async function loadStats(userId) {
-            const { data: sessions, error } = await window.supabaseClient
+            const { data: sessions, error } = await supabaseClient
                 .from('listening_sessions')
                 .select('duration_ms')
                 .eq('user_id', userId);

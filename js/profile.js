@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
     // Verificar si el usuario está logueado
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
         window.location.href = 'index.html';
         return;
@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Configurar Logout
     document.getElementById('logout-btn').addEventListener('click', async () => {
-        await window.supabaseClient.auth.signOut();
+        await supabaseClient.auth.signOut();
         window.location.href = 'index.html';
     });
 
