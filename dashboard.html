@@ -19,33 +19,78 @@
         </div>
     </nav>
 
-    <main class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Tarjeta Stats -->
-        <div class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 md:col-span-2 hover:bg-[#282828] transition-colors">
-            <h2 class="text-neutral-400 mb-1">Tiempo Total de Escucha</h2>
-            <div class="text-5xl font-bold mb-4"><span id="total-hours">0</span><span class="text-lg text-[#1DB954] ml-1">h</span> <span id="total-minutes">0</span><span class="text-lg text-[#1DB954] ml-1">m</span></div>
-            <p class="text-xs text-neutral-500">Desde tu registro</p>
-        </div>
-
-        <div class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 flex flex-col justify-center items-center hover:bg-[#282828] transition-colors">
-            <button class="bg-[#1DB954] text-black font-bold py-3 px-5 rounded-full hover:scale-105 transition-transform text-sm">Comparar con Amigos</button>
-            <p class="text-xs text-neutral-500 mt-4 text-center">Estadísticas globales</p>
-        </div>
-
-        <!-- Contenedor Now Playing -->
-        <div id="now-playing-card" class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 md:col-span-3 flex items-center gap-4 hidden hover:bg-[#282828] transition-colors mt-2">
-            <img id="np-image" class="w-16 h-16 rounded-md shadow-md object-cover" src="" alt="Album Art">
-            <div class="flex-1 overflow-hidden">
-                <p class="text-xs text-[#1DB954] font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
-                    <span class="relative flex h-2 w-2">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1DB954] opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-2 w-2 bg-[#1DB954]"></span>
-                    </span>
-                    Escuchando ahora
-                </p>
-                <h3 id="np-title" class="text-lg font-bold text-white truncate">Canción</h3>
-                <p id="np-artist" class="text-sm text-neutral-400 truncate">Artista</p>
+    <main class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Columna Izquierda (En Vivo y Últimas Escuchadas) -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            <!-- Contenedor Now Playing (Hero) -->
+            <div id="now-playing-card" class="relative overflow-hidden bg-gradient-to-br from-[#1DB954]/20 to-[#121212] p-6 sm:p-8 rounded-2xl border border-[#1DB954]/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 hidden shadow-2xl shadow-[#1DB954]/10 transition-all text-center sm:text-left">
+                <img id="np-image" class="w-20 h-20 sm:w-24 sm:h-24 rounded-lg shadow-2xl object-cover z-10" src="" alt="Album Art">
+                <div class="flex-1 overflow-hidden z-10 w-full">
+                    <p class="text-xs text-[#1DB954] font-bold uppercase tracking-wider mb-2 flex items-center justify-center sm:justify-start gap-2">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1DB954] opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#1DB954]"></span>
+                        </span>
+                        Escuchando ahora
+                    </p>
+                    <h3 id="np-title" class="text-2xl sm:text-3xl font-black text-white truncate mb-1">Canción</h3>
+                    <p id="np-artist" class="text-base sm:text-lg text-neutral-300 truncate">Artista</p>
+                </div>
+                <!-- Decoración de fondo -->
+                <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+                    <svg width="200" height="200" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" /></svg>
+                </div>
             </div>
+
+            <!-- Últimas 5 Escuchadas -->
+            <div class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl">
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-white">
+                    <svg class="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Historial Reciente
+                </h3>
+                <div id="recent-tracks-list" class="flex flex-col">
+                    <div class="animate-pulse flex space-x-4 p-3">
+                        <div class="rounded-md bg-neutral-800 h-10 w-10"></div>
+                        <div class="flex-1 space-y-2 py-1">
+                            <div class="h-2 bg-neutral-800 rounded w-3/4"></div>
+                            <div class="h-2 bg-neutral-800 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha (Resumen Histórico) -->
+        <div class="flex flex-col gap-6">
+            <!-- Tarjeta Stats Total -->
+            <div class="bg-gradient-to-b from-[#181818] to-[#121212] p-6 rounded-2xl border border-neutral-800 text-center shadow-xl">
+                <h2 class="text-neutral-400 mb-2 font-medium">Tiempo de Escucha</h2>
+                <div class="text-5xl font-black mb-1 text-white"><span id="total-hours">0</span><span class="text-lg text-[#1DB954] ml-1">h</span> <span id="total-minutes">0</span><span class="text-lg text-[#1DB954] ml-1">m</span></div>
+                <p class="text-xs text-[#1DB954] bg-[#1DB954]/10 inline-block px-3 py-1 rounded-full mt-2">Registrado en la nube</p>
+            </div>
+
+            <!-- Top Día -->
+            <div class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl">
+                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🔥 Tu obsesión de hoy</h3>
+                <div id="card-top-today" class="min-h-[72px]">
+                    <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
+                </div>
+            </div>
+
+            <!-- Top Semana -->
+            <div class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl">
+                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🏆 Rey de la semana</h3>
+                <div id="card-top-week" class="min-h-[72px]">
+                    <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
+                </div>
+            </div>
+
+            <!-- Botón Amigos (Preparación para Fase 4) -->
+            <button class="bg-white text-black font-bold py-4 px-6 rounded-2xl hover:scale-[1.02] transition-transform w-full shadow-lg shadow-white/5 flex items-center justify-center gap-2 mt-auto">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                Retar a un Amigo
+            </button>
         </div>
     </main>
 
@@ -86,6 +131,7 @@
                     }
                     
                     loadStats(session.user.id);
+                    loadDynamicStats(session); // <--- Nueva función que carga los Tops
                     // Actualizar si tracking.js guarda una nueva canción
                     document.addEventListener('trackSaved', () => loadStats(session.user.id));
                 } else {
@@ -132,5 +178,6 @@
             document.getElementById('total-minutes').textContent = minutes;
         }
     </script>
+    <script src="js/dashboard_stats.js"></script>
 </body>
 </html>
