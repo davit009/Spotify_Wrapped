@@ -21,14 +21,14 @@
     <main class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Tarjeta Stats -->
         <div class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 md:col-span-2 hover:bg-[#282828] transition-colors">
-            <h2 class="text-neutral-400 mb-1">Tiempo de Escucha (Batalla)</h2>
-            <div class="text-5xl font-bold mb-4">0<span class="text-lg text-[#1DB954] ml-1">h</span> 0<span class="text-lg text-[#1DB954] ml-1">m</span></div>
+            <h2 class="text-neutral-400 mb-1">Tiempo Total de Escucha</h2>
+            <div class="text-5xl font-bold mb-4"><span id="total-hours">0</span><span class="text-lg text-[#1DB954] ml-1">h</span> <span id="total-minutes">0</span><span class="text-lg text-[#1DB954] ml-1">m</span></div>
             <p class="text-xs text-neutral-500">Desde tu registro</p>
         </div>
 
         <div class="bg-[#181818] p-6 rounded-xl border border-neutral-800 col-span-1 flex flex-col justify-center items-center hover:bg-[#282828] transition-colors">
-            <button class="bg-[#1DB954] text-black font-bold py-3 px-6 rounded-full hover:scale-105 transition-transform">Ver Leaderboard</button>
-            <p class="text-xs text-neutral-500 mt-4 text-center">Próximamente...</p>
+            <button class="bg-[#1DB954] text-black font-bold py-3 px-5 rounded-full hover:scale-105 transition-transform text-sm">Comparar con Amigos</button>
+            <p class="text-xs text-neutral-500 mt-4 text-center">Estadísticas globales</p>
         </div>
 
         <!-- Contenedor Now Playing -->
@@ -71,6 +71,10 @@
                         avatarImg.src = userMeta.avatar_url;
                         avatarImg.classList.remove('hidden');
                     }
+                    
+                    loadStats(session.user.id);
+                    // Actualizar si tracking.js guarda una nueva canción
+                    document.addEventListener('trackSaved', () => loadStats(session.user.id));
                 } else {
                     // Si no hay sesión, programar la expulsión (por si no carga en 2 seg)
                     console.log("No hay sesión aún. Esperando 2 segundos...");
@@ -92,6 +96,28 @@
                 window.location.href = 'index.html';
             });
         });
+
+        async function loadStats(userId) {
+            const { data: sessions, error } = await window.supabaseClient
+                .from('listening_sessions')
+                .select('duration_ms')
+                .eq('user_id', userId);
+                
+            if (error) {
+                console.error("Error cargando estadísticas:", error);
+                return;
+            }
+            
+            // Sumar duraciones
+            const totalMs = sessions.reduce((acc, curr) => acc + curr.duration_ms, 0);
+            const totalMinutes = Math.floor(totalMs / 60000);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            // Actualizar interfaz
+            document.getElementById('total-hours').textContent = hours;
+            document.getElementById('total-minutes').textContent = minutes;
+        }
     </script>
 </body>
 </html>
