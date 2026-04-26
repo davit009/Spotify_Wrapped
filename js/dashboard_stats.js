@@ -148,78 +148,44 @@ async function fetchTracksFromSpotify(ids) {
         await new Promise(resolve => setTimeout(resolve, waitMs));
     }
 
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
-        const batch = missingIds.slice(i, i + BATCH_SIZE);
-
+    // Plan B: Pedir tracks uno por uno (algunas apps nuevas tienen bloqueado el endpoint plural /tracks)
+    for (const id of missingIds) {
         if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) break;
 
-        // Obtener token válido (refresca si es necesario)
         const token = _session ? await TokenManager.getToken(_session) : TokenManager.getCached();
-        if (!token) { showTokenExpiredUI(); break; }
+        if (!token) break;
 
         try {
-            console.log('Enviando request a Spotify con token:', token ? token.substring(0, 15) + '...' : 'NULL');
-            const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
+            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (res.ok) {
-                const data = await res.json();
-                (data.tracks || []).forEach(trackData => {
-                    if (!trackData) return;
-                    globalStats.spotifyCache[trackData.id] = trackData;
-                    try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
-                });
-            } else if (res.status === 401 || res.status === 400 || res.status === 403) {
-                console.warn(`🔒 Token inválido (${res.status}). Intentando refresh automático...`);
-                TokenManager.invalidate();
-                if (!_session) { showTokenExpiredUI(); break; }
-
+                const trackData = await res.json();
+                globalStats.spotifyCache[trackData.id] = trackData;
+                try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
+            } else if (res.status === 401 || res.status === 403) {
+                // Si falla uno por token, intentamos un refresh rápido
                 const newToken = await TokenManager.refresh(_session);
-                if (!newToken) { showTokenExpiredUI(); break; }
-
-                const retry = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
+                if (!newToken) break;
+                
+                const retry = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                     headers: { 'Authorization': `Bearer ${newToken}` }
                 });
                 if (retry.ok) {
-                    const data = await retry.json();
-                    (data.tracks || []).forEach(trackData => {
-                        if (!trackData) return;
-                        globalStats.spotifyCache[trackData.id] = trackData;
-                        try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
-                    });
-                } else {
-                    const errText = await retry.text();
-                    console.error('Spotify retry falló con status:', retry.status, 'Detalle:', errText);
-                    
-                    // SUPER DEBUG: ¿Podemos al menos ver quién soy?
-                    const meRes = await fetch('https://api.spotify.com/v1/me', {
-                        headers: { 'Authorization': `Bearer ${newToken}` }
-                    });
-                    if (meRes.ok) {
-                        const meData = await meRes.json();
-                        console.log('✅ El token SÍ funciona para el perfil:', meData.id, meData.email);
-                        console.warn('⚠️ El problema es ESPECÍFICO del endpoint de canciones. Posible restricción de Spotify a apps nuevas.');
-                    } else {
-                        const meErr = await meRes.text();
-                        console.error('❌ El token tampoco funciona para el perfil. Detalle:', meErr);
-                        console.error('🔥 Tu App o tu IP están completamente bloqueadas por Spotify.');
-                    }
-
-                    showTokenExpiredUI(); break;
+                    const trackData = await retry.json();
+                    globalStats.spotifyCache[trackData.id] = trackData;
+                    try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
                 }
             } else if (res.status === 429) {
                 if (typeof SpotifyRL !== 'undefined') SpotifyRL.register429(res);
-                console.error('🚨 429 - Abortando batch de tracks.');
                 break;
             }
-
-            if (i + BATCH_SIZE < missingIds.length) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
+            
+            // Pequeña pausa para no saturar
+            await new Promise(r => setTimeout(r, 100));
         } catch(e) {
-            console.error('Error en batch de tracks:', e);
+            console.error('Error cargando track individual:', id, e);
         }
     }
 }
