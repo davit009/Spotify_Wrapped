@@ -3,265 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpotiStats - Dashboard</title>
+    <title>SpotiStats | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        #album-bg {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            background-size: cover;
-            background-position: center;
-            filter: blur(90px) brightness(0.22) saturate(2);
-            transform: scale(1.2);
-            opacity: 0;
-            transition: opacity 2.5s ease;
-            pointer-events: none;
-        }
-        #album-bg.visible { opacity: 1; }
-        body > *:not(#album-bg):not(.fixed) { position: relative; z-index: 1; }
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .bg-dynamic { transition: background 2s ease; }
+        #album-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; filter: blur(80px) saturate(1.5); opacity: 0; transition: opacity 2s ease; background-size: cover; background-position: center; }
+        #album-bg.visible { opacity: 0.3; }
     </style>
 </head>
-<body class="bg-[#121212] text-white min-h-screen p-6">
-    <!-- Fondo dinámico del álbum en reproducción -->
+<body class="min-h-screen p-4 sm:p-8">
     <div id="album-bg"></div>
-    <!-- Banner de Rate Limit (oculto por defecto, el rate_limiter.js lo activa) -->
-    <div id="rl-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-yellow-500/90 text-black text-xs font-bold text-center py-2 px-4 backdrop-blur-sm"></div>
 
-    <nav class="max-w-4xl mx-auto flex justify-between items-center mb-10 border-b border-neutral-800 pb-4">
-        <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Stats</span></h1>
+    <header class="max-w-7xl mx-auto flex justify-between items-center mb-10">
         <div class="flex items-center gap-3">
-            <a href="profile.html" class="text-xs font-bold text-black bg-[#1DB954] hover:bg-[#1ed760] transition-colors px-3 py-1.5 rounded-full mr-2">Historia Musical</a>
-            
-            <!-- Botón Settings -->
-            <button id="settings-btn" class="text-neutral-400 hover:text-white transition-colors" title="Configuraciones">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            </button>
-
-            <!-- Info de usuario -->
-            <img id="user-avatar" class="w-8 h-8 rounded-full hidden" alt="Avatar">
-            <span id="user-name" class="text-neutral-300 font-medium hidden sm:inline">Cargando...</span>
+            <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
+                <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.5 14.75c-.15.25-.45.35-.7.2-2.35-1.45-5.3-1.75-8.8-.95-.3.05-.6-.15-.65-.45s.15-.6.45-.65c3.85-.85 7.1-.5 9.7 1.1.25.15.35.45.2.75zm1.25-2.75c-.2.3-.6.4-.9.2-2.7-1.65-6.8-2.15-9.95-1.15-.35.1-.7-.1-.8-.45s.1-.7.45-.8c3.65-1.1 8.15-.55 11.25 1.35.3.15.4.55.2.85zm.1-2.8c-3.25-1.95-8.65-2.15-11.75-1.2-.5.15-1-.15-1.15-.65-.15-.5.15-1 .65-1.15 3.55-1.1 9.5-.85 13.25 1.4.45.25.6.85.35 1.3-.25.45-.85.6-1.35.3z"/></svg>
+            </div>
+            <h1 class="text-2xl font-black tracking-tighter">SpotiStats</h1>
         </div>
-    </nav>
+        <div class="flex items-center gap-4">
+            <a href="profile.html" class="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Historial Completo</a>
+            <button id="settings-btn" class="p-2 text-neutral-400 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+            <div class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10">
+                <img id="user-avatar" src="" class="w-8 h-8 rounded-full border border-white/10 hidden" alt="Avatar">
+                <span id="user-name" class="text-sm font-bold">Cargando...</span>
+            </div>
+        </div>
+    </header>
 
-    <main class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-8">
         
-        <!-- Columna Izquierda (En Vivo y Últimas Escuchadas) -->
-        <div class="lg:col-span-2 flex flex-col gap-6">
-            <!-- Reproductor Premium Custom (Control Remoto Real) -->
-            <div id="now-playing-card" class="hidden relative overflow-hidden bg-[#181818] rounded-2xl border border-white/5 shadow-2xl transition-all duration-500 group">
-                <!-- Fondo con desenfoque dinámico sutil dentro de la tarjeta -->
-                <div id="np-blur-bg" class="absolute inset-0 opacity-20 blur-3xl scale-150 pointer-events-none transition-all duration-1000"></div>
-                
-                <div class="relative z-10 p-5 flex flex-col sm:flex-row items-center gap-5">
-                    <!-- Portada con efecto de profundidad -->
-                    <div class="relative shrink-0 group/cover">
-                        <img id="np-image" class="w-24 h-24 sm:w-28 sm:h-28 rounded-lg shadow-[0_12px_40px_rgba(0,0,0,0.5)] object-cover transition-transform duration-500 group-hover:scale-105" src="" alt="Album Art">
-                        <div class="absolute inset-0 bg-black/20 rounded-lg opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center">
-                            <svg class="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM10 16.5v-9l6 4.5-6 4.5z"/></svg>
-                        </div>
+        <!-- Columna Izquierda: Reproducción y Actividad -->
+        <div class="flex flex-col gap-6">
+            <!-- Reproduciendo Ahora (Card Premium) -->
+            <div id="now-playing-card" class="relative group overflow-hidden rounded-[2.5rem] glass p-1 transition-all duration-700 hidden shadow-2xl">
+                <div class="flex flex-col sm:flex-row gap-6 p-6 relative z-10">
+                    <!-- Album Art con Efecto -->
+                    <div class="relative shrink-0 w-full sm:w-48 aspect-square rounded-3xl overflow-hidden shadow-2xl group-hover:scale-[1.02] transition-transform duration-700">
+                        <img id="np-image" src="" class="w-full h-full object-cover" alt="Album Art">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                     </div>
 
                     <!-- Info de la Canción -->
-                    <div class="flex-1 min-w-0 text-center sm:text-left">
+                    <div class="flex-1 min-w-0 text-center sm:text-left flex flex-col justify-center">
                         <div class="flex items-center justify-center sm:justify-start gap-2 mb-2">
                             <span class="flex h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse"></span>
                             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-[#1DB954]">En Vivo</span>
                         </div>
-                        <h3 id="np-title" class="text-xl sm:text-2xl font-black text-white truncate drop-shadow-sm">Cargando...</h3>
-                        <p id="np-artist" class="text-sm sm:text-base text-neutral-400 truncate mb-4">Artista</p>
+                        <h3 id="np-title" class="text-xl sm:text-3xl font-black text-white truncate mb-1">Cargando...</h3>
+                        <p id="np-artist" class="text-base sm:text-lg text-neutral-400 truncate mb-6">Artista</p>
 
-                        <!-- Controles de Reproducción (Controlan tu dispositivo activo) -->
-                        <div class="flex items-center justify-center sm:justify-start gap-6">
-                            <button onclick="spotifyPlayerAction('previous', 'POST')" class="text-neutral-400 hover:text-white transition-colors p-1" title="Anterior">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                        <!-- Controles -->
+                        <div class="flex items-center justify-center sm:justify-start gap-8">
+                            <button onclick="spotifyPlayerAction('previous', 'POST')" class="text-neutral-500 hover:text-white transition-colors">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
                             </button>
-                            <button id="player-play-pause-custom" class="bg-white text-black p-3 rounded-full hover:scale-110 active:scale-95 transition-all shadow-xl">
-                                <svg id="play-icon-custom" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                <svg id="pause-icon-custom" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            <button id="player-play-pause" class="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-xl">
+                                <svg id="play-icon-custom" class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                <svg id="pause-icon-custom" class="w-8 h-8 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                             </button>
-                            <button onclick="spotifyPlayerAction('next', 'POST')" class="text-neutral-400 hover:text-white transition-colors p-1" title="Siguiente">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zm9-12v12h2V6z"/></svg>
+                            <button onclick="spotifyPlayerAction('next', 'POST')" class="text-neutral-500 hover:text-white transition-colors">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zm9-12v12h2V6z"/></svg>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Barra de Progreso Única e Integrada -->
-                <div class="relative z-10 px-5 pb-5">
-                    <div class="flex justify-between text-[10px] text-neutral-500 mb-1.5 font-mono tracking-widest">
+                <!-- Barra de Progreso Integrada -->
+                <div class="px-8 pb-8">
+                    <div class="flex justify-between text-[10px] text-neutral-500 mb-2 font-mono">
                         <span id="np-current-time">0:00</span>
                         <span id="np-duration">0:00</span>
                     </div>
-                    <div class="group/progress relative w-full bg-white/5 h-1 rounded-full overflow-hidden cursor-pointer">
-                        <div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 ease-linear shadow-[0_0_12px_rgba(29,185,84,0.6)]"></div>
+                    <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                        <div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 ease-linear shadow-[0_0_15px_rgba(29,185,84,0.5)]"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Recomendación Especial (Solo se muestra cuando NO hay música) -->
-            <div id="recommendation-card" class="mt-2 bg-[#181818] p-4 rounded-2xl border border-white/5 transition-all duration-500">
-                <p class="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3">Para descubrir</p>
-                <iframe
-                    title="Spotify Embed: Recommendation Playlist"
-                    src="https://open.spotify.com/embed/playlist/27ihwE9FbTEVPVe03XLJdL?utm_source=generator&theme=0"
-                    width="100%"
-                    height="152"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                    class="rounded-xl"
-                ></iframe>
-            </div>
-
-            <!-- Últimas 5 Escuchadas -->
-            <div id="recent-history-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-neutral-600 hover:bg-[#1a1a1a] transition-all group">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold flex items-center gap-2 text-white">
-                        <svg class="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <!-- Últimas escuchadas -->
+            <div id="recent-history-card" class="glass p-8 rounded-[2.5rem] cursor-pointer hover:border-neutral-700 transition-all group">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-black flex items-center gap-3">
+                        <svg class="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Últimas escuchadas
                     </h3>
-                    <span class="text-xs text-neutral-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Ver completo &rarr;</span>
+                    <span class="text-xs font-bold text-neutral-500 group-hover:text-[#1DB954] transition-colors uppercase tracking-widest">Ver Todo &rarr;</span>
                 </div>
-                <div id="recent-tracks-list" class="flex flex-col">
-                    <div class="animate-pulse flex space-x-4 p-3">
-                        <div class="rounded-md bg-neutral-800 h-10 w-10"></div>
-                        <div class="flex-1 space-y-2 py-1">
-                            <div class="h-2 bg-neutral-800 rounded w-3/4"></div>
-                            <div class="h-2 bg-neutral-800 rounded w-1/2"></div>
-                        </div>
-                    </div>
+                <div id="recent-tracks-list" class="space-y-4">
+                    <!-- Inyectado por JS -->
                 </div>
             </div>
         </div>
 
-        <!-- Columna Derecha (Resumen Histórico) -->
+        <!-- Columna Derecha: Estadísticas y Desafíos -->
         <div class="flex flex-col gap-6">
-            <!-- Tarjeta Stats Total -->
-            <div class="bg-gradient-to-b from-[#181818] to-[#121212] p-6 rounded-2xl border border-neutral-800 text-center shadow-xl">
-                <h2 class="text-neutral-400 mb-2 font-medium">Tiempo de Escucha</h2>
-                <div class="text-5xl font-black mb-1 text-white"><span id="total-hours">0</span><span class="text-lg text-[#1DB954] ml-1">h</span> <span id="total-minutes">0</span><span class="text-lg text-[#1DB954] ml-1">m</span></div>
-                <p class="text-xs text-[#1DB954] bg-[#1DB954]/10 inline-block px-3 py-1 rounded-full mt-2">Registrado en la nube</p>
+            
+            <!-- Cards de Estadísticas -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div id="card-top-today" class="glass p-6 rounded-3xl min-h-[160px] flex flex-col justify-center relative overflow-hidden group cursor-pointer">
+                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Más escuchada (Hoy)</h3>
+                    <!-- Inyectado -->
+                </div>
+                <div id="card-top-week" class="glass p-6 rounded-3xl min-h-[160px] flex flex-col justify-center relative overflow-hidden group cursor-pointer">
+                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Más escuchada (Semana)</h3>
+                    <!-- Inyectado -->
+                </div>
+                <div class="glass p-6 rounded-3xl flex flex-col items-center justify-center text-center">
+                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-1 tracking-widest">Total Escuchado</h3>
+                    <p id="stats-total-hours" class="text-4xl font-black italic">0<span class="text-lg font-normal text-neutral-600 ml-1">h</span></p>
+                </div>
+
+                <!-- SOCIAL SUMMARY (FASE 4) -->
+                <div id="card-social-today" class="glass p-6 rounded-3xl min-h-[140px] flex flex-col justify-center relative group hover:scale-[1.02] transition-transform cursor-pointer">
+                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Líder del Día (Dúo)</h3>
+                    <div id="social-today-content" class="flex items-center gap-3">
+                        <p class="text-xs text-neutral-600 italic">No tienes retos hoy.</p>
+                    </div>
+                </div>
+                <div id="card-social-week" class="glass p-6 rounded-3xl min-h-[140px] flex flex-col justify-center relative group hover:scale-[1.02] transition-transform cursor-pointer">
+                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Líder de la Semana</h3>
+                    <div id="social-week-content" class="flex items-center gap-3">
+                        <p class="text-xs text-neutral-600 italic">No tienes retos esta semana.</p>
+                    </div>
+                </div>
             </div>
 
-            <!-- Top Día -->
-            <div id="top-today-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-[#1DB954]/50 hover:-translate-y-1 transition-all group relative">
-                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🔥 Más escuchada (Hoy)</h3>
-                <div id="card-top-today" class="min-h-[72px]">
-                    <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
-                </div>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-neutral-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </div>
+            <!-- Botón de Desafíos -->
+            <div class="mt-4">
+                <button id="open-social-btn" class="bg-white text-black font-black py-5 px-6 rounded-[2rem] hover:scale-[1.02] transition-all w-full shadow-2xl flex items-center justify-center gap-3 uppercase text-xs tracking-widest">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    Gestionar Desafíos
+                </button>
             </div>
-
-            <!-- Top Semana -->
-            <div id="top-week-card" class="bg-[#181818] p-6 rounded-2xl border border-neutral-800 shadow-xl cursor-pointer hover:border-[#1DB954]/50 hover:-translate-y-1 transition-all group relative">
-                <h3 class="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">🏆 Más escuchada (Semana)</h3>
-                <div id="card-top-week" class="min-h-[72px]">
-                    <p class="text-xs text-neutral-600 italic mt-4">Buscando datos...</p>
-                </div>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-neutral-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </div>
-            </div>
-
-            <!-- Botón Amigos (Preparación para Fase 4) -->
-            <button class="bg-white text-black font-bold py-4 px-6 rounded-2xl hover:scale-[1.02] transition-transform w-full shadow-lg shadow-white/5 flex items-center justify-center gap-2 mt-auto">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                Retar a un Amigo
-            </button>
         </div>
     </main>
 
-    <!-- Modal de Configuraciones -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
-        <!-- ... content remains the same, we just insert the next modal right after ... -->
-        <div class="bg-[#181818] p-8 rounded-2xl border border-neutral-800 w-full max-w-md shadow-2xl mx-4 transform transition-all scale-95 opacity-0" id="settings-modal-content">
-            <h2 class="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-                <svg class="w-6 h-6 text-[#1DB954]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Configuraciones
-            </h2>
-            
-            <div class="space-y-6">
-                <!-- Toggle Merge History -->
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <p class="font-bold text-white">Fusionar Historial Pasado</p>
-                        <p class="text-xs text-neutral-400 mt-1">Suma las horas de tus archivos importados al marcador global del dashboard.</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" id="toggle-history" class="sr-only peer">
-                        <div class="w-11 h-6 bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1DB954]"></div>
-                    </label>
+    <!-- Modal Social (Buscador y Retos) -->
+    <div id="social-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh]" id="social-modal-content">
+            <div class="flex justify-between items-start mb-8 shrink-0">
+                <div>
+                    <h2 class="text-4xl font-black text-white italic">Dúos</h2>
+                    <p class="text-neutral-500 text-xs font-bold uppercase tracking-widest mt-1">Conecta y Compite</p>
                 </div>
-            </div>
-
-            <div class="mt-8 flex justify-between items-center border-t border-neutral-800 pt-6">
-                <button id="logout-btn" class="text-red-500 font-bold hover:text-red-400 transition-colors text-sm flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    Cerrar Sesión
-                </button>
-                <button id="close-settings-btn" class="bg-white text-black font-bold py-2 px-6 rounded-full hover:scale-105 transition-transform text-sm">Cerrar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Dinámico de Listas (Historial / Tops) -->
-    <div id="list-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-[#181818] p-6 sm:p-8 rounded-2xl border border-neutral-800 w-full max-w-lg shadow-2xl transform transition-all scale-95 opacity-0 flex flex-col max-h-[85vh]" id="list-modal-content">
-            <div class="flex justify-between items-start mb-6 shrink-0">
-                <h2 id="list-modal-title" class="text-2xl font-black text-white text-[#1DB954]">Título</h2>
-                <button id="close-list-modal" class="text-neutral-500 hover:text-white transition-colors bg-neutral-800/50 hover:bg-neutral-800 p-2 rounded-full">
+                <button id="close-social-modal" class="bg-white/5 hover:bg-white/10 p-3 rounded-full transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             
-            <p id="list-modal-subtitle" class="text-neutral-400 text-sm mb-4 shrink-0 hidden">Subtítulo</p>
+            <div class="flex gap-6 mb-8 border-b border-white/5 pb-2 shrink-0">
+                <button class="social-tab active text-[#1DB954] border-b-2 border-[#1DB954] pb-4 font-black uppercase text-xs tracking-widest" data-tab="active">Mis Retos</button>
+                <button class="social-tab text-neutral-500 hover:text-white pb-4 font-black uppercase text-xs tracking-widest transition-colors" data-tab="search">Buscar Amigos</button>
+            </div>
 
-            <div id="list-modal-body" class="overflow-y-auto pr-2 space-y-3 flex-1 flex flex-col custom-scrollbar">
-                <!-- Se inyectan los items desde JS -->
+            <div id="social-tab-active" class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+                <div class="text-center py-10 text-neutral-600 italic">No hay retos activos.</div>
+            </div>
+
+            <div id="social-tab-search" class="hidden flex-1 flex flex-col overflow-hidden">
+                <div class="relative mb-6 shrink-0">
+                    <input type="text" id="user-search-input" placeholder="Nombre de tu amigo..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-12 text-white focus:outline-none focus:border-[#1DB954] transition-colors">
+                    <svg class="w-5 h-5 text-neutral-500 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <div id="user-search-results" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                    <!-- Resultados -->
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Modal de Configuraciones -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div id="settings-modal-content" class="bg-[#181818] p-8 rounded-[3rem] border border-white/5 w-full max-w-md shadow-2xl">
+            <h2 class="text-3xl font-black text-white mb-6 italic">Ajustes</h2>
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-bold text-white">Modo Ahorro de Energía</p>
+                        <p class="text-[10px] text-neutral-500 uppercase tracking-widest">Reduce el refresco automático</p>
+                    </div>
+                    <button class="w-12 h-6 bg-neutral-800 rounded-full relative"><span class="absolute left-1 top-1 w-4 h-4 bg-neutral-500 rounded-full"></span></button>
+                </div>
+                <button id="logout-btn" class="w-full py-4 text-red-500 font-black border border-red-500/20 rounded-2xl hover:bg-red-500/10 transition-colors uppercase text-xs tracking-widest">Cerrar Sesión</button>
+                <button id="close-settings-btn" class="w-full py-4 bg-white text-black font-black rounded-2xl hover:scale-105 transition-transform uppercase text-xs tracking-widest">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dinámico de Listas -->
+    <div id="list-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]" id="list-modal-content">
+            <div class="flex justify-between items-start mb-8 shrink-0">
+                <h2 id="list-modal-title" class="text-4xl font-black italic text-white text-[#1DB954]">Título</h2>
+                <button id="close-list-modal" class="bg-white/5 hover:bg-white/10 p-3 rounded-full transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="list-modal-body" class="overflow-y-auto pr-2 space-y-3 flex-1 custom-scrollbar"></div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
-    <!-- ⚠️ Cargamos el rate limiter y token manager ANTES de tracking y dashboard_stats -->
     <script src="js/rate_limiter.js"></script>
     <script src="js/token_manager.js"></script>
     <script src="js/tracking.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            let redirectTimeout;
-            let initialized = false;
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        import { supabaseClient } from './js/supabase.js';
+        import { initDashboard } from './js/dashboard_stats.js';
+        import { checkCurrentlyPlaying, syncOfflineHistory } from './js/tracking.js';
+        import { initSocial } from './js/social.js';
 
-            async function initDashboard(session) {
-                if (initialized) return;
-                initialized = true;
-                if (redirectTimeout) clearTimeout(redirectTimeout);
+        let redirectTimeout;
+        let initialized = false;
 
-                // Guardar tokens frescos en BD si vienen en la sesión (solo tras OAuth)
-                let updatePayload = { id: session.user.id };
-                let hasNewTokens = false;
-                if (session.provider_refresh_token) { updatePayload.spotify_refresh_token = session.provider_refresh_token; hasNewTokens = true; }
-                if (session.provider_token)         { updatePayload.spotify_access_token  = session.provider_token;         hasNewTokens = true; }
-                if (hasNewTokens) {
-                    try { await supabaseClient.from('users').upsert(updatePayload, { onConflict: 'id', defaultToNull: false }); }
-                    catch (err) { console.error('Error guardando tokens:', err); }
-                }
-
-                // Recuperar token de Spotify:
-                // - Si session.provider_token ya tiene valor (justo tras OAuth), usarlo directamente
-                // - Solo leer de BD como fallback (navegaciones normales post-login)
-                if (!session.provider_token) {
+        async function startDashboard(session) {
+            if (initialized) return;
+            initialized = true;
+            if (redirectTimeout) clearTimeout(redirectTimeout);
+            
+            if (session) {
+                // Sincronizar token local si es necesario
+                if (session.user) {
                     const { data: userData } = await supabaseClient
                         .from('users').select('spotify_access_token').eq('id', session.user.id).single();
                     if (userData?.spotify_access_token) session.provider_token = userData.spotify_access_token;
                 }
-                console.log('🔑 Token disponible:', session.provider_token ? '✅ Sí' : '❌ No');
 
-                // Actualizar UI con datos del usuario
+                // Actualizar UI Usuario
                 const userMeta = session.user.user_metadata;
                 document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
                 if (userMeta.avatar_url) {
@@ -270,122 +250,40 @@
                     avatarImg.classList.remove('hidden');
                 }
 
-                loadStats(session.user.id);
+                // Cargar Stats e Iniciar Social
+                initDashboard(session);
+                initSocial(session.user);
+
                 if (typeof syncOfflineHistory === 'function') {
-                    syncOfflineHistory(session).then(() => loadDynamicStats(session));
-                } else {
-                    loadDynamicStats(session);
+                    syncOfflineHistory(session);
                 }
-                document.addEventListener('trackSaved', () => loadStats(session.user.id));
             }
+        }
 
-            // === ESTRATEGIA DE AUTH ===
-            // getSession() → rápido, solo decide si hay sesión para no redirigir prematuramente
-            // onAuthStateChange → init real del dashboard (auth context y RLS completamente listos)
-            // Este orden garantiza que las queries a listening_sessions funcionen correctamente.
+        // Auth Flow
+        const { data: { session: quickCheck } } = await supabaseClient.auth.getSession();
+        if (!quickCheck) {
+            redirectTimeout = setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+        }
 
-            const { data: { session: quickCheck } } = await supabaseClient.auth.getSession();
-            if (!quickCheck) {
-                // Sin sesión conocida → redirigir si onAuthStateChange tampoco trae una
-                redirectTimeout = setTimeout(() => { window.location.href = 'index.html'; }, 3000);
-            }
-
-            // Init principal siempre via onAuthStateChange
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (session) {
-                    await initDashboard(session);
-                }
-            });
-
-            // Lógica de Logout
-            document.getElementById('logout-btn').addEventListener('click', async () => {
-                await supabaseClient.auth.signOut();
-                window.location.href = 'index.html';
-            });
-
-            // Lógica de Modal de Configuración
-            const settingsModal = document.getElementById('settings-modal');
-            const settingsModalContent = document.getElementById('settings-modal-content');
-            
-            document.getElementById('settings-btn').addEventListener('click', () => {
-                settingsModal.classList.remove('hidden');
-                setTimeout(() => {
-                    settingsModalContent.classList.remove('scale-95', 'opacity-0');
-                    settingsModalContent.classList.add('scale-100', 'opacity-100');
-                }, 10);
-            });
-
-            document.getElementById('close-settings-btn').addEventListener('click', () => {
-                settingsModalContent.classList.remove('scale-100', 'opacity-100');
-                settingsModalContent.classList.add('scale-95', 'opacity-0');
-                setTimeout(() => settingsModal.classList.add('hidden'), 150);
-            });
-
-            // Lógica de Guardado de Preferencia Toggle
-            document.getElementById('toggle-history').addEventListener('change', async (e) => {
-                const isChecked = e.target.checked;
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    await supabaseClient.from('users').update({ 
-                        preferences: { merge_history: isChecked } 
-                    }).eq('id', session.user.id);
-                    // Recargar stats para reflejar el cambio al instante
-                    loadStats(session.user.id);
-                }
-            });
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (session) startDashboard(session);
+            else if (event === 'SIGNED_OUT') window.location.href = 'index.html';
         });
 
-        async function loadStats(userId) {
-            // 1. Cargar preferencias y datos históricos
-            const { data: userData } = await supabaseClient
-                .from('users')
-                .select('preferences, historical_stats')
-                .eq('id', userId)
-                .single();
-
-            const prefs = userData?.preferences || { merge_history: false };
-            const toggleEl = document.getElementById('toggle-history');
-            if (toggleEl) toggleEl.checked = prefs.merge_history;
-
-            // 2. Cargar sesiones nuevas
-            const { data: sessions, error } = await supabaseClient
-                .from('listening_sessions')
-                .select('duration_ms')
-                .eq('user_id', userId);
-                
-            let totalMs = 0;
-            if (sessions) {
-                totalMs = sessions.reduce((acc, curr) => acc + curr.duration_ms, 0);
-            }
-            
-            // 3. Fusionar historial del AÑO EN CURSO si la preferencia está activa
-            // (no sumamos todos los años del historial importado, solo el año actual)
-            if (prefs.merge_history && userData?.historical_stats) {
-                const currentYear = new Date().getFullYear().toString();
-                const hist = userData.historical_stats;
-
-                if (hist.yearlyStats?.[currentYear]) {
-                    // Tenemos datos por año → solo sumamos el año en curso
-                    const yearMs = hist.yearlyStats[currentYear].totalMsPlayed
-                                || (hist.yearlyStats[currentYear].hours * 3600000);
-                    totalMs += yearMs;
-                } else if (!hist.yearlyStats) {
-                    // Formato antiguo sin desglose por año → sumamos todo (fallback)
-                    const histMs = hist.totalMsPlayed || (hist.hours * 3600000);
-                    totalMs += histMs;
-                }
-                // Si hay yearlyStats pero no tiene el año actual, no sumamos nada del JSON
-            }
-            
-            // 4. Calcular y renderizar
-            const totalMinutes = Math.floor(totalMs / 60000);
-            const hours = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            
-            document.getElementById('total-hours').textContent = hours;
-            document.getElementById('total-minutes').textContent = minutes;
-        }
+        // Eventos Globales de UI
+        document.getElementById('logout-btn').addEventListener('click', () => supabaseClient.auth.signOut());
+        
+        const settingsModal = document.getElementById('settings-modal');
+        const settingsModalContent = document.getElementById('settings-modal-content');
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+            setTimeout(() => settingsModalContent.classList.remove('scale-95', 'opacity-0'), 10);
+        });
+        document.getElementById('close-settings-btn').addEventListener('click', () => {
+            settingsModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => settingsModal.classList.add('hidden'), 150);
+        });
     </script>
-    <script src="js/dashboard_stats.js"></script>
 </body>
 </html>

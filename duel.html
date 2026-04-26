@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dúo Musical | SpotiStats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #121212; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .spotify-green { color: #1DB954; }
+        .progress-container { height: 12px; background: #282828; border-radius: 6px; overflow: hidden; position: relative; }
+        .progress-bar { height: 100%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        .avatar-glow { box-shadow: 0 0 20px rgba(29, 185, 84, 0.2); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 sm:p-8">
+    
+    <header class="max-w-4xl mx-auto w-full flex justify-between items-center mb-12">
+        <a href="dashboard.html" class="bg-neutral-800 p-3 rounded-full hover:bg-neutral-700 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        </a>
+        <div class="text-center">
+            <h1 class="text-xl font-black uppercase tracking-widest text-neutral-500">Dúo Musical</h1>
+            <p id="challenge-status" class="text-xs text-[#1DB954] font-bold">ACTIVO</p>
+        </div>
+        <div class="w-12"></div> <!-- Spacer -->
+    </header>
+
+    <main class="max-w-4xl mx-auto w-full flex-1 flex flex-col gap-8">
+        
+        <!-- Tarjeta Principal de Comparación -->
+        <div class="glass rounded-[3rem] p-8 sm:p-12 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#1DB954] to-transparent opacity-20"></div>
+            
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-12 relative z-10">
+                <!-- Usuario 1 (Tú) -->
+                <div class="text-center flex-1 order-1">
+                    <div class="relative inline-block mb-4">
+                        <img id="u1-avatar" src="" class="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-neutral-800 avatar-glow object-cover bg-neutral-900">
+                        <div class="absolute -bottom-2 -right-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-1 rounded-md">TÚ</div>
+                    </div>
+                    <h2 id="u1-name" class="text-xl sm:text-2xl font-black truncate">...</h2>
+                    <p id="u1-time" class="text-3xl sm:text-4xl font-black mt-2">0<span class="text-sm font-normal text-neutral-500">h</span> 0<span class="text-sm font-normal text-neutral-500">m</span></p>
+                </div>
+
+                <!-- Divisor VS -->
+                <div class="flex flex-col items-center gap-2 order-2">
+                    <span class="text-4xl sm:text-6xl font-black italic text-neutral-800 select-none">VS</span>
+                </div>
+
+                <!-- Usuario 2 (Amigo) -->
+                <div class="text-center flex-1 order-3">
+                    <div class="relative inline-block mb-4">
+                        <img id="u2-avatar" src="" class="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-neutral-800 object-cover bg-neutral-900">
+                    </div>
+                    <h2 id="u2-name" class="text-xl sm:text-2xl font-black truncate">...</h2>
+                    <p id="u2-time" class="text-3xl sm:text-4xl font-black mt-2">0<span class="text-sm font-normal text-neutral-500">h</span> 0<span class="text-sm font-normal text-neutral-500">m</span></p>
+                </div>
+            </div>
+
+            <!-- Barra de Progreso Comparativa -->
+            <div class="mt-12 space-y-2">
+                <div class="flex justify-between text-[10px] font-black uppercase tracking-tighter text-neutral-500">
+                    <span>Tu Ritmo</span>
+                    <span>Su Ritmo</span>
+                </div>
+                <div class="progress-container">
+                    <div id="u1-progress" class="progress-bar bg-[#1DB954]" style="width: 50%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas Detalladas (Cards) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="glass rounded-3xl p-6">
+                <h3 class="text-xs font-black uppercase text-neutral-500 mb-4">Lo más escuchado en el Dúo</h3>
+                <div class="space-y-6">
+                    <!-- Artista -->
+                    <div class="flex justify-between items-center gap-4">
+                        <div class="flex-1">
+                            <p class="text-[10px] text-neutral-500 font-bold uppercase">Tu artista</p>
+                            <p id="u1-top-artist" class="font-bold truncate">...</p>
+                        </div>
+                        <div class="w-px h-8 bg-neutral-800"></div>
+                        <div class="flex-1 text-right">
+                            <p class="text-[10px] text-neutral-500 font-bold uppercase">Su artista</p>
+                            <p id="u2-top-artist" class="font-bold truncate">...</p>
+                        </div>
+                    </div>
+                    <!-- Canción -->
+                    <div class="flex justify-between items-center gap-4">
+                        <div class="flex-1">
+                            <p class="text-[10px] text-neutral-500 font-bold uppercase">Tu canción</p>
+                            <p id="u1-top-track" class="font-bold truncate">...</p>
+                        </div>
+                        <div class="w-px h-8 bg-neutral-800"></div>
+                        <div class="flex-1 text-right">
+                            <p class="text-[10px] text-neutral-500 font-bold uppercase">Su canción</p>
+                            <p id="u2-top-track" class="font-bold truncate">...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass rounded-3xl p-6 flex flex-col justify-center text-center">
+                <h3 class="text-xs font-black uppercase text-neutral-500 mb-2">Días restantes</h3>
+                <p id="days-left" class="text-5xl font-black italic">--</p>
+                <p id="date-range" class="text-[10px] text-neutral-500 mt-2">Del -- al --</p>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="mt-12 text-center text-neutral-600 text-[10px] uppercase font-bold tracking-widest pb-8">
+        SpotiStats Dúo • Solo cuenta el tiempo desde el inicio del desafío
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script type="module" src="js/duel.js"></script>
+</body>
+</html>
