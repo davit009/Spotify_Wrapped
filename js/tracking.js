@@ -221,6 +221,7 @@ function hideNowPlaying() {
 
 async function syncOfflineHistory(session) {
     try {
+        if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) return;
         const token = typeof TokenManager !== 'undefined' ? await TokenManager.getToken(session) : session.provider_token;
         if (!token) return;
 

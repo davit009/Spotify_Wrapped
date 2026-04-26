@@ -159,6 +159,7 @@ async function fetchTracksFromSpotify(ids) {
         if (!token) { showTokenExpiredUI(); break; }
 
         try {
+            console.log('Enviando request a Spotify con token:', token ? token.substring(0, 15) + '...' : 'NULL');
             const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
