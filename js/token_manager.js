@@ -1,41 +1,36 @@
 import { supabaseClient } from './supabase.js';
 
 /**
- * Obtiene un token de acceso válido de Spotify.
- * Si el token ha expirado, intenta refrescarlo automáticamente.
+ * Obtiene un token de acceso válido de Spotify desde la tabla 'users'.
  */
 export async function getValidToken(userId) {
     try {
-        // Intentamos buscar en 'spotify_tokens' que es el nombre estándar para este proyecto
-        let { data, error } = await supabaseClient
-            .from('spotify_tokens')
-            .select('*')
-            .eq('user_id', userId)
+        console.log("Obteniendo token para usuario:", userId);
+        
+        // El token está en la tabla 'users', no en una tabla aparte
+        const { data, error } = await supabaseClient
+            .from('users')
+            .select('spotify_access_token, spotify_refresh_token, spotify_token_expires_at')
+            .eq('id', userId)
             .single();
 
-        // Si falla (404), intentamos con 'user_tokens' por si acaso
-        if (error && error.code === 'PGRST116' || error?.status === 404) {
-             const fallback = await supabaseClient
-                .from('user_tokens')
-                .select('*')
-                .eq('user_id', userId)
-                .single();
-             data = fallback.data;
-             error = fallback.error;
-        }
-
-        if (error || !data) {
-            console.warn("No se encontraron tokens en spotify_tokens ni user_tokens. Verifica la base de datos.");
+        if (error || !data || !data.spotify_access_token) {
+            console.warn("No se encontró spotify_access_token en la tabla 'users'.");
             return null;
         }
 
         const now = Math.floor(Date.now() / 1000);
-        if (data.expires_at < now + 300) {
-            console.log("Token cerca de expirar. Refrescando...");
-            return await refreshSpotifyToken(userId, data.refresh_token);
+        // Si no tenemos fecha de expiración o ya expiró, intentamos usar el actual o refrescar
+        const expiresAt = data.spotify_token_expires_at || 0;
+
+        if (expiresAt > 0 && expiresAt < now + 300) {
+            if (data.spotify_refresh_token) {
+                console.log("Token expirado. Refrescando...");
+                return await refreshSpotifyToken(userId, data.spotify_refresh_token);
+            }
         }
 
-        return data.access_token;
+        return data.spotify_access_token;
     } catch (e) {
         console.error("Error crítico en getValidToken:", e);
         return null;
@@ -43,11 +38,11 @@ export async function getValidToken(userId) {
 }
 
 /**
- * Refresca el token de Spotify
+ * Refresca el token de Spotify y lo guarda en la tabla 'users'
  */
 async function refreshSpotifyToken(userId, refreshToken) {
     try {
-        // Intentamos obtener el Client ID de la configuración global
+        // Buscamos el Client ID en la configuración global si existe
         const clientId = window.SPOTIFY_CLIENT_ID || 'TU_CLIENT_ID'; 
 
         const response = await fetch('https://accounts.spotify.com/api/token', {
@@ -64,12 +59,14 @@ async function refreshSpotifyToken(userId, refreshToken) {
         
         if (data.access_token) {
             const now = Math.floor(Date.now() / 1000);
-            // Actualizamos en ambas posibles tablas para mayor seguridad
-            await supabaseClient.from('spotify_tokens').update({
-                access_token: data.access_token,
-                expires_at: now + data.expires_in
-            }).eq('user_id', userId);
-
+            await supabaseClient
+                .from('users')
+                .update({
+                    spotify_access_token: data.access_token,
+                    spotify_token_expires_at: now + data.expires_in
+                })
+                .eq('id', userId);
+            
             return data.access_token;
         }
         return null;
