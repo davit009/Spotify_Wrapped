@@ -26,6 +26,9 @@
 <body class="bg-[#121212] text-white min-h-screen p-6">
     <!-- Fondo dinámico del álbum en reproducción -->
     <div id="album-bg"></div>
+    <!-- Banner de Rate Limit (oculto por defecto, el rate_limiter.js lo activa) -->
+    <div id="rl-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-yellow-500/90 text-black text-xs font-bold text-center py-2 px-4 backdrop-blur-sm"></div>
+
     <nav class="max-w-4xl mx-auto flex justify-between items-center mb-10 border-b border-neutral-800 pb-4">
         <h1 class="text-2xl font-bold">Spoti<span class="text-[#1DB954]">Stats</span></h1>
         <div class="flex items-center gap-3">
@@ -203,6 +206,8 @@
     </div>
 
     <script src="js/config.js"></script>
+    <!-- ⚠️ Cargamos el rate limiter ANTES de tracking y dashboard_stats -->
+    <script src="js/rate_limiter.js"></script>
     <script src="js/tracking.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {

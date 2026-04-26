@@ -66,12 +66,12 @@ async function loadDynamicStats(session) {
 
 
     // Guardar para modal
-    globalStats.recent = recentSessions.slice(0, 20); // Limitamos a 20 para no saturar la API
-    
+    globalStats.recent = recentSessions.slice(0, 20); // Limitamos a 20
+
     const today = new Date();
     today.setHours(0,0,0,0);
     const todaySessions = recentSessions.filter(s => new Date(s.played_at) >= today);
-    
+
     globalStats.today = getTopTracks(todaySessions, 5);
     globalStats.week = getTopTracks(recentSessions, 5);
 
@@ -81,12 +81,12 @@ async function loadDynamicStats(session) {
     globalStats.today.forEach(t => idsToFetch.add(t.id));
     globalStats.week.forEach(t => idsToFetch.add(t.id));
 
-    // Consultar API de Spotify inicial
+    // Consultar API de Spotify en batch (1 sola petición para todos los IDs)
     await fetchTracksFromSpotify(Array.from(idsToFetch), token);
 
     // Renderizar Vistas Iniciales
     renderRecentList(globalStats.recent.slice(0, 5));
-    
+
     if (globalStats.today.length > 0 && globalStats.spotifyCache[globalStats.today[0].id]) {
         renderTopCard('card-top-today', globalStats.spotifyCache[globalStats.today[0].id], globalStats.today[0].ms);
     } else {
@@ -113,40 +113,76 @@ function getTopTracks(sessionsArray, limit = 5) {
         .slice(0, limit);
 }
 
+/**
+ * Obtiene datos de tracks de Spotify usando el endpoint BATCH /tracks?ids=...
+ * Máximo 50 IDs por petición → drásticamente menos llamadas que pedir 1 a 1.
+ * Respeta el rate limiter global (SpotifyRL) antes de cada petición.
+ */
 async function fetchTracksFromSpotify(ids, token) {
-    const missingIds = ids.filter(id => !globalStats.spotifyCache[id]);
-    if (missingIds.length === 0) return;
-
-    for (const id of missingIds) {
-        // Buscar primero en localStorage
+    // Filtrar los que no están en caché en memoria ni en localStorage
+    const missingIds = ids.filter(id => {
+        if (globalStats.spotifyCache[id]) return false;
         try {
             const cached = localStorage.getItem('spotify_track_' + id);
             if (cached) {
                 globalStats.spotifyCache[id] = JSON.parse(cached);
-                continue;
+                return false;
             }
         } catch(e) {}
+        return true;
+    });
+
+    if (missingIds.length === 0) return;
+
+    // Verificar si estamos bloqueados por rate limit
+    if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) {
+        const waitMs = SpotifyRL.msUntilUnblock();
+        console.warn(`⏳ Rate limit activo. Esperando ${Math.ceil(waitMs / 1000)}s antes de pedir tracks.`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+
+    // Dividir en bloques de 50 (límite del endpoint batch de Spotify)
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+        const batch = missingIds.slice(i, i + BATCH_SIZE);
+
+        // Verificar rate limit antes de cada batch
+        if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) {
+            console.warn('⏳ Rate limit activo, abortando peticiones de tracks.');
+            break;
+        }
 
         try {
-            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+            const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+
             if (res.ok) {
-                const trackData = await res.json();
-                globalStats.spotifyCache[trackData.id] = trackData;
-                try {
-                    localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData));
-                } catch(e) {} // Ignorar quota exceeded
+                const data = await res.json();
+                (data.tracks || []).forEach(trackData => {
+                    if (!trackData) return;
+                    globalStats.spotifyCache[trackData.id] = trackData;
+                    try {
+                        localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData));
+                    } catch(e) {} // Ignorar quota exceeded
+                });
             } else if (res.status === 401 || res.status === 400) {
-                console.warn(`Token expirado al pedir track ${id}.`);
+                console.warn(`Token expirado al pedir tracks.`);
+                break;
             } else if (res.status === 429) {
-                const retryAfter = res.headers.get('Retry-After');
-                const waitSecs = retryAfter ? parseInt(retryAfter) : 5;
-                console.error(`🚨 LÍMITE DE SPOTIFY 429 🚨 - Estás temporalmente bloqueado. Abortando peticiones de canciones para no empeorar el castigo. Spotify exige esperar ${waitSecs} segundos.`);
-                break; // <-- Romper el ciclo de inmediato para no congelar la página
+                if (typeof SpotifyRL !== 'undefined') {
+                    SpotifyRL.register429(res);
+                }
+                console.error('🚨 LÍMITE DE SPOTIFY 429 🚨 - Abortando batch de tracks.');
+                break;
+            }
+
+            // Pequeña pausa entre batches para no saturar (solo si hay más batches)
+            if (i + BATCH_SIZE < missingIds.length) {
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch(e) {
-            console.error("Error individual:", e);
+            console.error("Error en batch de tracks:", e);
         }
     }
 }
@@ -231,10 +267,10 @@ function setupModals(token) {
     // Clic Historial Reciente
     document.getElementById('recent-history-card').addEventListener('click', async () => {
         openModal('Historial Completo', 'Tus últimas 20 canciones escuchadas');
-        
+
         const idsToFetch = globalStats.recent.map(s => s.track_id);
         await fetchTracksFromSpotify(idsToFetch, token);
-        
+
         modalBody.innerHTML = '';
         renderRecentList(globalStats.recent, 'list-modal-body');
     });
@@ -255,7 +291,7 @@ function setupModals(token) {
 function renderTopListInModal(topArray, typeName) {
     const modalBody = document.getElementById('list-modal-body');
     modalBody.innerHTML = '';
-    
+
     if (topArray.length === 0) {
         modalBody.innerHTML = '<p class="text-neutral-500">No hay datos suficientes.</p>';
         return;
@@ -264,7 +300,7 @@ function renderTopListInModal(topArray, typeName) {
     // Top 1 (Destacado)
     const t1 = globalStats.spotifyCache[topArray[0].id];
     const mins1 = Math.floor(topArray[0].ms / 60000);
-    
+
     modalBody.innerHTML += `
         <div class="bg-gradient-to-br from-[#1DB954]/20 to-black p-6 rounded-2xl border border-[#1DB954]/50 text-center mb-6 shadow-2xl">
             <p class="text-[#1DB954] font-black text-xs uppercase tracking-widest mb-4">👑 #1 MÁS ESCUCHADA</p>
@@ -282,12 +318,12 @@ function renderTopListInModal(topArray, typeName) {
     // Runners up
     if (topArray.length > 1) {
         modalBody.innerHTML += '<h4 class="font-bold text-neutral-400 uppercase tracking-widest text-xs mb-3 pl-2">Pisándole los talones:</h4>';
-        
+
         topArray.slice(1).forEach((item, index) => {
             const t = globalStats.spotifyCache[item.id];
             if(!t) return;
             const mins = Math.floor(item.ms / 60000);
-            
+
             modalBody.innerHTML += `
                 <div class="flex items-center gap-4 p-3 bg-[#181818] rounded-xl border border-neutral-800">
                     <span class="text-neutral-600 font-black w-4 text-center">#${index + 2}</span>

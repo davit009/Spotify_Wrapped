@@ -2,6 +2,12 @@ let currentTrackInfo = null;
 
 let isReauthenticatingTracking = false;
 async function checkCurrentlyPlaying() {
+    // ── Rate limit global ──────────────────────────────────────────────
+    if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) {
+        console.info('⏳ Polling pausado: rate limit activo.');
+        return;
+    }
+
     // Obtenemos la sesión
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
@@ -33,6 +39,14 @@ async function checkCurrentlyPlaying() {
             return;
         }
 
+        // 429 → registrar en rate limiter global
+        if (response.status === 429) {
+            if (typeof SpotifyRL !== 'undefined') SpotifyRL.register429(response);
+            console.error('🚨 429 en currently-playing. Polling pausado según Retry-After.');
+            hideNowPlaying();
+            return;
+        }
+
         // 204 significa que Spotify está pausado o apagado
         if (response.status === 204 || response.status > 400) {
             hideNowPlaying();
@@ -42,16 +56,16 @@ async function checkCurrentlyPlaying() {
         }
 
         const data = await response.json();
-        
+
         if (data && data.item && data.item.type === 'track') {
             const track = data.item;
-            
+
             // Cachar en localStorage para que dashboard_stats.js no tenga que pedirlo de nuevo
-            try { localStorage.setItem('spotify_track_' + track.id, JSON.stringify(track)); } catch(e) {}
+            try { localStorage.setItem('spotify_track_' + track.id, JSON.stringify(track)); } catch (e) { }
 
             const isPlaying = data.is_playing;
             const currentProgress = data.progress_ms;
-            
+
             showNowPlaying(track, isPlaying, currentProgress);
 
             if (isPlaying) {
@@ -101,12 +115,16 @@ async function getSpotifyToken() {
             const { data: userData } = await supabaseClient
                 .from('users').select('spotify_access_token').eq('id', session.user.id).single();
             token = userData?.spotify_access_token || null;
-        } catch (e) {}
+        } catch (e) { }
     }
     return token;
 }
 
 async function spotifyPlayerAction(action, method = 'POST') {
+    if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) {
+        console.info('⏳ Acción de player bloqueada por rate limit.');
+        return;
+    }
     const token = await getSpotifyToken();
     if (!token) return;
     try {
@@ -118,6 +136,8 @@ async function spotifyPlayerAction(action, method = 'POST') {
             setTimeout(checkCurrentlyPlaying, 500);
         } else if (res.status === 403) {
             console.warn("Control de reproducción requiere Spotify Premium.");
+        } else if (res.status === 429) {
+            if (typeof SpotifyRL !== 'undefined') SpotifyRL.register429(res);
         }
     } catch (e) {
         console.error(`Error en acción ${action}:`, e);
@@ -139,7 +159,7 @@ function updateProgressUI(progress, duration) {
     const bar = document.getElementById('np-progress-bar');
     const currentEl = document.getElementById('np-current-time');
     const durationEl = document.getElementById('np-duration');
-    
+
     if (bar && duration > 0) {
         const pct = Math.min((progress / duration) * 100, 100);
         bar.style.width = `${pct}%`;
@@ -240,8 +260,8 @@ async function syncOfflineHistory(session) {
                 // Guardar track en caché local para evitar error 429 en el dashboard
                 try {
                     localStorage.setItem('spotify_track_' + item.track.id, JSON.stringify(item.track));
-                } catch(e) {}
-                
+                } catch (e) { }
+
                 return {
                     user_id: session.user.id,
                     track_id: item.track.id,
@@ -253,15 +273,16 @@ async function syncOfflineHistory(session) {
                 .upsert(sessionsToInsert, { onConflict: 'user_id, played_at', ignoreDuplicates: true });
             if (!error) document.dispatchEvent(new CustomEvent('trackSaved'));
         }
-    } catch(e) { console.error("Error en sync offline:", e); }
+    } catch (e) { console.error("Error en sync offline:", e); }
 }
 
-// Polling intervals
-setInterval(checkCurrentlyPlaying, 5000);
+// Polling interval: 15 segundos para evitar saturar el rate limit de Spotify.
+// (la canción dura mínimo ~30s, este intervalo es suficiente para detectar cambios)
+setInterval(checkCurrentlyPlaying, 15000);
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(checkCurrentlyPlaying, 2000);
-    
+
     document.getElementById('player-play-pause')?.addEventListener('click', async () => {
         const token = await getSpotifyToken();
         if (!token) return;
