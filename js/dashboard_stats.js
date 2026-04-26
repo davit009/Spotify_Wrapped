@@ -178,7 +178,6 @@ async function fetchTracksFromSpotify(ids) {
                 const newToken = await TokenManager.refresh(_session);
                 if (!newToken) { showTokenExpiredUI(); break; }
 
-                // Reintentar este batch con el token nuevo
                 const retry = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
                     headers: { 'Authorization': `Bearer ${newToken}` }
                 });
@@ -190,6 +189,8 @@ async function fetchTracksFromSpotify(ids) {
                         try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
                     });
                 } else {
+                    const errText = await retry.text();
+                    console.error('Spotify retry falló con status:', retry.status, 'Detalle:', errText);
                     showTokenExpiredUI(); break;
                 }
             } else if (res.status === 429) {
