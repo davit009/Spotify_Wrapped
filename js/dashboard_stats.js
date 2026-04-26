@@ -76,8 +76,12 @@ async function loadStats(userId) {
     }
 
     let totalMs = recentSessions.reduce((acc, s) => acc + s.duration_ms, 0);
+    const hours = Math.floor(totalMs / 3600000);
+    const mins = Math.floor((totalMs % 3600000) / 60000);
     const totalHoursEl = document.getElementById('stats-total-hours');
-    if (totalHoursEl) totalHoursEl.innerHTML = `${Math.floor(totalMs / 3600000)}<span class="text-lg font-normal text-neutral-600 ml-1">h</span>`;
+    if (totalHoursEl) {
+        totalHoursEl.innerHTML = `${hours}<span class="text-lg font-normal text-neutral-600 ml-1">h</span> ${mins}<span class="text-lg font-normal text-neutral-600 ml-1">m</span>`;
+    }
 }
 
 async function loadSocialSummaries(userId) {
