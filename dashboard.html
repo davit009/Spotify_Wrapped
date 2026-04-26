@@ -60,6 +60,14 @@
                         <div class="flex items-center gap-2 mb-1"><span class="flex h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse"></span><span class="text-[9px] font-black uppercase tracking-[0.3em] text-[#1DB954]">En Vivo</span></div>
                         <h3 id="np-title" class="text-xl font-black text-white truncate">...</h3>
                         <p id="np-artist" class="text-sm text-neutral-400 truncate mb-4">...</p>
+                        
+                        <!-- CONTROLES DE REPRODUCCIÓN -->
+                        <div class="flex items-center justify-center sm:justify-start gap-6 mb-6">
+                            <button id="np-prev" class="text-neutral-500 hover:text-white transition-colors"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+                            <button id="np-play" class="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform"><svg id="play-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+                            <button id="np-next" class="text-neutral-500 hover:text-white transition-colors"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></svg></button>
+                        </div>
+
                         <div class="w-full bg-white/5 h-1 rounded-full overflow-hidden mb-2"><div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 linear"></div></div>
                         <div class="flex justify-between text-[9px] text-neutral-500 font-mono"><span id="np-current-time">0:00</span><span id="np-duration">0:00</span></div>
                     </div>
@@ -122,6 +130,11 @@
             syncOfflineHistory(session);
             setInterval(() => checkCurrentlyPlaying(session), 5000);
             checkCurrentlyPlaying(session);
+
+            // EVENTOS DE CONTROL DE MÚSICA
+            document.getElementById('np-prev')?.addEventListener('click', () => import('./js/tracking.js').then(m => m.spotifyControl('prev', session)));
+            document.getElementById('np-play')?.addEventListener('click', () => import('./js/tracking.js').then(m => m.spotifyControl('play', session)));
+            document.getElementById('np-next')?.addEventListener('click', () => import('./js/tracking.js').then(m => m.spotifyControl('next', session)));
         }
 
         bootstrap();

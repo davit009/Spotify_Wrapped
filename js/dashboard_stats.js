@@ -14,13 +14,36 @@ export async function initDashboard(session) {
     setupClickHandlers();
 }
 
+/**
+ * Carga el tiempo total sumando historial JSON y sesiones en vivo si está habilitado
+ */
 async function loadTotalTime(userId) {
-    const { data } = await supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId);
-    const totalMs = (data || []).reduce((acc, s) => acc + s.duration_ms, 0);
+    // Obtenemos preferencias e historial del usuario
+    const { data: user } = await supabaseClient
+        .from('users')
+        .select('historical_stats, preferences')
+        .eq('id', userId)
+        .single();
+
+    // Obtenemos sesiones en vivo (tiempo real)
+    const { data: realtime } = await supabaseClient
+        .from('listening_sessions')
+        .select('duration_ms')
+        .eq('user_id', userId);
+    
+    let totalMs = (realtime || []).reduce((acc, s) => acc + s.duration_ms, 0);
+
+    // Si el usuario quiere fusionar el historial (Settings), sumamos los milisegundos del JSON
+    if (user?.preferences?.merge_history && user?.historical_stats) {
+        const jsonMs = user.historical_stats.totalMsPlayed || 0;
+        totalMs += jsonMs;
+    }
+    
     const hours = Math.floor(totalMs / 3600000);
     const minutes = Math.floor((totalMs % 3600000) / 60000);
+    
     const el = document.getElementById('stats-total-hours');
-    if (el) el.innerHTML = `${hours}<span class="text-sm opacity-40 ml-0.5">h</span> ${minutes}<span class="text-sm opacity-40 ml-0.5">m</span>`;
+    if (el) el.innerHTML = `${hours}<span class="text-xl sm:text-2xl opacity-40 ml-1">h</span> ${minutes}<span class="text-xl sm:text-2xl opacity-40 ml-1">m</span>`;
 }
 
 async function loadTops(userId, session) {
@@ -48,7 +71,6 @@ async function getTopTracks(userId, sinceIso, session) {
     for (const id of sortedIds) {
         let track = JSON.parse(localStorage.getItem('spotify_track_' + id));
         if (!track && token) {
-            // Si no hay foto, la pedimos a Spotify
             const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, { headers: {'Authorization': `Bearer ${token}`} });
             if (res.ok) {
                 track = await res.json();
@@ -63,11 +85,20 @@ async function getTopTracks(userId, sinceIso, session) {
 function renderTopCard(elementId, track) {
     const el = document.getElementById(elementId);
     if (!el) return;
-    if (!track) { el.innerHTML += `<p class="text-[9px] text-neutral-600 italic">Sin datos.</p>`; return; }
+    if (!track) { 
+        const title = elementId === 'card-top-today' ? 'Hoy' : 'Semanal';
+        el.innerHTML = `<h3 class="text-[8px] font-black uppercase text-neutral-500 mb-1 tracking-widest absolute top-5 left-5">${title}</h3><p class="text-[9px] text-neutral-600 italic">Sin datos.</p>`; 
+        return; 
+    }
     const imgUrl = track.album?.images[0]?.url || '';
     el.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), transparent), url(${imgUrl})`;
     el.style.backgroundSize = 'cover';
     el.style.backgroundPosition = 'center';
+    
+    // Mantener el título arriba
+    const titleText = elementId === 'card-top-today' ? 'Hoy' : 'Semanal';
+    el.innerHTML = `<h3 class="text-[8px] font-black uppercase text-white/50 mb-1 tracking-widest absolute top-5 left-5">${titleText}</h3>`;
+    
     const content = document.createElement('div');
     content.className = "relative z-10";
     content.innerHTML = `<p class="text-[10px] font-black text-white truncate w-full">${track.name}</p><p class="text-[8px] text-[#1DB954] font-bold uppercase tracking-widest">${track.play_count} escuchas</p>`;
@@ -85,7 +116,7 @@ function showListModal(title, tracks) {
     const titleEl = document.getElementById('list-modal-title');
     if (!modal || !body) return;
     titleEl.textContent = title;
-    body.innerHTML = tracks.length === 0 ? '<p class="text-center text-neutral-500 py-10 italic text-xs">Vacío.</p>' : '';
+    body.innerHTML = tracks.length === 0 ? '<p class="text-center text-neutral-500 py-10 italic text-xs">Aún no hay datos para mostrar.</p>' : '';
     tracks.forEach((track, index) => {
         const div = document.createElement('div');
         div.className = "flex items-center gap-3 p-2.5 bg-white/5 rounded-2xl border border-white/5";

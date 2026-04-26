@@ -3,9 +3,6 @@ import { getValidToken } from './token_manager.js';
 
 let lastTrackId = null;
 
-/**
- * Verifica qué está escuchando el usuario actualmente en Spotify
- */
 export async function checkCurrentlyPlaying(session) {
     try {
         const token = await getValidToken(session.user.id);
@@ -16,27 +13,20 @@ export async function checkCurrentlyPlaying(session) {
         });
 
         const npCard = document.getElementById('now-playing-card');
-
         if (response.status === 204 || response.status > 400) {
             if (npCard) npCard.classList.add('hidden');
             return;
         }
 
         const data = await response.json();
-        
         if (data && data.item) {
             const track = data.item;
-            const isPlaying = data.is_playing;
-
             if (npCard) {
                 npCard.classList.remove('hidden');
-                
-                // Actualizar UI
                 document.getElementById('np-title').textContent = track.name;
                 document.getElementById('np-artist').textContent = track.artists.map(a => a.name).join(', ');
                 document.getElementById('np-image').src = track.album.images[0].url;
                 
-                // Progreso
                 const progress = (data.progress_ms / track.duration_ms) * 100;
                 const bar = document.getElementById('np-progress-bar');
                 if (bar) bar.style.width = `${progress}%`;
@@ -44,20 +34,50 @@ export async function checkCurrentlyPlaying(session) {
                 document.getElementById('np-current-time').textContent = formatMs(data.progress_ms);
                 document.getElementById('np-duration').textContent = formatMs(track.duration_ms);
 
-                // Cambiar fondo dinámico si es una canción nueva
+                // Actualizar icono de play/pausa
+                const playIcon = document.getElementById('play-icon');
+                if (playIcon) {
+                    playIcon.innerHTML = data.is_playing 
+                        ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' // Icono Pausa
+                        : '<path d="M8 5v14l11-7z"/>'; // Icono Play
+                }
+
                 if (track.id !== lastTrackId) {
                     lastTrackId = track.id;
                     updateDynamicBackground(track.album.images[0].url);
-                    // Guardar en Supabase si es necesario (lógica de guardado de sesiones)
                     saveListeningSession(session.user.id, track, data.timestamp);
                 }
             }
-        } else {
-            if (npCard) npCard.classList.add('hidden');
+        } else if (npCard) {
+            npCard.classList.add('hidden');
         }
-    } catch (error) {
-        console.error("Error en checkCurrentlyPlaying:", error);
+    } catch (error) { console.error("Error en checkCurrentlyPlaying:", error); }
+}
+
+/**
+ * Controles de reproducción
+ */
+export async function spotifyControl(action, session) {
+    const token = await getValidToken(session.user.id);
+    if (!token) return;
+
+    let url = 'https://api.spotify.com/v1/me/player/';
+    let method = 'POST';
+
+    if (action === 'next') url += 'next';
+    else if (action === 'prev') url += 'previous';
+    else if (action === 'play') {
+        // Necesitamos saber si está pausado o no
+        const stateRes = await fetch('https://api.spotify.com/v1/me/player', { headers: {'Authorization': `Bearer ${token}`} });
+        if (stateRes.ok) {
+            const state = await stateRes.json();
+            url += state.is_playing ? 'pause' : 'play';
+            method = 'PUT';
+        }
     }
+
+    await fetch(url, { method, headers: {'Authorization': `Bearer ${token}`} });
+    setTimeout(() => checkCurrentlyPlaying(session), 500); // Refrescar rápido tras acción
 }
 
 function formatMs(ms) {
@@ -68,10 +88,7 @@ function formatMs(ms) {
 
 function updateDynamicBackground(imgUrl) {
     const bg = document.getElementById('album-bg');
-    if (bg) {
-        bg.style.backgroundImage = `url(${imgUrl})`;
-        bg.classList.add('visible');
-    }
+    if (bg) { bg.style.backgroundImage = `url(${imgUrl})`; bg.classList.add('visible'); }
 }
 
 async function saveListeningSession(userId, track, playedAt) {
@@ -82,14 +99,9 @@ async function saveListeningSession(userId, track, playedAt) {
             duration_ms: track.duration_ms,
             played_at: new Date(playedAt).toISOString()
         }, { onConflict: 'user_id,played_at' });
-    } catch (e) {
-        console.error("Error guardando sesión:", e);
-    }
+    } catch (e) { console.error("Error guardando sesión:", e); }
 }
 
-/**
- * Sincroniza el historial reciente (offline) de Spotify
- */
 export async function syncOfflineHistory(session) {
     try {
         const token = await getValidToken(session.user.id);
@@ -102,7 +114,5 @@ export async function syncOfflineHistory(session) {
                 await saveListeningSession(session.user.id, item.track, item.played_at);
             }
         }
-    } catch (e) {
-        console.error("Error en syncOfflineHistory:", e);
-    }
+    } catch (e) { console.error("Error en syncOfflineHistory:", e); }
 }
