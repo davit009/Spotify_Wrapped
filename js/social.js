@@ -15,8 +15,10 @@ export async function initSocial(currentUser) {
         });
     });
 
-    document.getElementById('add-friend-btn')?.addEventListener('click', () => {
+    // Nuevo listener para el botón dentro del perfil
+    document.getElementById('open-friends-btn')?.addEventListener('click', () => {
         document.getElementById('friend-modal').classList.remove('hidden');
+        document.getElementById('profile-dropdown').classList.remove('active'); // Cerrar menú
         switchTab('search', currentUser.id);
     });
 
@@ -46,7 +48,7 @@ export async function initSocial(currentUser) {
 function formatTime(ms) {
     const hours = Math.floor(ms / 3600000);
     const minutes = Math.floor((ms % 3600000) / 60000);
-    return `${hours}<span class="text-[14px] opacity-30 ml-1">h</span> ${minutes}<span class="text-[14px] opacity-30 ml-1">m</span>`;
+    return `${hours}<span class="text-[12px] opacity-60 ml-0.5 not-italic font-bold">h</span> ${minutes}<span class="text-[12px] opacity-60 ml-0.5 not-italic font-bold">m</span>`;
 }
 
 function getAvatarHTML(url, name, sizeClass = "w-20 h-20", isRobot = false) {
@@ -138,7 +140,6 @@ async function renderArena(userId) {
 
     container.innerHTML = `
         <div class="glass w-full rounded-[4rem] p-12 sm:p-20 relative overflow-hidden flex flex-col items-center">
-            <!-- PLAYERS SECTION -->
             <div class="flex items-center justify-center gap-12 sm:gap-24 mb-16 w-full">
                 <div class="flex flex-col items-center gap-6 flex-1">
                     <div class="relative">${userAvatar}</div>
@@ -159,7 +160,6 @@ async function renderArena(userId) {
                 </div>
             </div>
 
-            <!-- PROGRESS BAR -->
             <div class="w-full max-w-lg mb-12">
                 <div class="h-2 bg-white/5 rounded-full flex overflow-hidden p-0.5">
                     <div class="h-full bg-[#1DB954] transition-all duration-1000 shadow-[0_0_15px_rgba(29,185,84,0.4)]" style="width: ${myPercent}%"></div>
@@ -171,12 +171,11 @@ async function renderArena(userId) {
                 </div>
             </div>
 
-            <!-- WIN HISTORY & STATUS -->
             ${winHistoryHTML}
             
             <div class="py-4 px-12 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-md">
                 <p class="text-center text-[10px] font-black uppercase tracking-[0.5em] text-neutral-400 italic">
-                    ${myTime >= friendTime ? 'Escucha Superior' : 'Escucha Inferior'}
+                    ${myTime >= friendTime ? 'Vas arriba' : 'Vas abajo'}
                 </p>
             </div>
         </div>
