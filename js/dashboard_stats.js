@@ -1,43 +1,19 @@
-let globalStats = {
-    today: [],
-    week: [],
-    recent: [],
-    spotifyCache: {}
-};
+let _session = null; // módulo-level para que fetchTracksFromSpotify pueda refrescar
 
 async function loadDynamicStats(session) {
+    _session = session;
     const userId = session.user.id;
 
-    // Intentar token de sesión primero (disponible justo tras OAuth, sin necesitar BD)
-    let token = session.provider_token || null;
+    // Inicializar TokenManager (cachea token de OAuth o BD)
+    const token = await TokenManager.init(session);
 
-    // Si no hay token en sesión, intentar leerlo de la BD una sola vez
     if (!token) {
-        try {
-            const { data: uData, error: tokenError } = await supabaseClient
-                .from('users')
-                .select('spotify_access_token')
-                .eq('id', userId)
-                .single();
-
-            if (tokenError) {
-                console.warn('No se pudo leer el token de Spotify de la BD:', tokenError.message,
-                    '\n→ Si ves errores 400, ejecuta la migración SQL de Supabase primero.');
-            } else {
-                token = uData?.spotify_access_token || null;
-            }
-        } catch (e) {
-            console.warn('Error de red al leer token:', e.message);
+        console.warn('No hay token de Spotify. Intentando refresh...');
+        const refreshed = await TokenManager.refresh(session);
+        if (!refreshed) {
+            showTokenExpiredUI();
+            return;
         }
-    }
-
-    if (!token) {
-        console.warn('No hay token de Spotify disponible. El historial dinámico requiere iniciar sesión nuevamente.');
-        const msg = '<p class="text-neutral-500 text-sm py-4">Inicia sesión nuevamente para ver esta información.</p>';
-        document.getElementById('recent-tracks-list').innerHTML = msg;
-        document.getElementById('card-top-today').innerHTML = msg;
-        document.getElementById('card-top-week').innerHTML = msg;
-        return;
     }
 
 
@@ -66,7 +42,7 @@ async function loadDynamicStats(session) {
 
 
     // Guardar para modal
-    globalStats.recent = recentSessions.slice(0, 20); // Limitamos a 20
+    globalStats.recent = recentSessions.slice(0, 20);
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -75,14 +51,14 @@ async function loadDynamicStats(session) {
     globalStats.today = getTopTracks(todaySessions, 5);
     globalStats.week = getTopTracks(recentSessions, 5);
 
-    // Recolectar IDs iniciales (Top 5 día, Top 5 semana, y las últimas 5)
+    // Recolectar IDs iniciales
     const idsToFetch = new Set();
     globalStats.recent.slice(0, 5).forEach(s => idsToFetch.add(s.track_id));
     globalStats.today.forEach(t => idsToFetch.add(t.id));
     globalStats.week.forEach(t => idsToFetch.add(t.id));
 
-    // Consultar API de Spotify en batch (1 sola petición para todos los IDs)
-    await fetchTracksFromSpotify(Array.from(idsToFetch), token);
+    // Consultar API de Spotify en batch (usa TokenManager internamente)
+    await fetchTracksFromSpotify(Array.from(idsToFetch));
 
     // Renderizar Vistas Iniciales
     renderRecentList(globalStats.recent.slice(0, 5));
@@ -98,7 +74,7 @@ async function loadDynamicStats(session) {
     }
 
     // Configurar Modales
-    setupModals(token);
+    setupModals();
 }
 
 function getTopTracks(sessionsArray, limit = 5) {
@@ -114,12 +90,36 @@ function getTopTracks(sessionsArray, limit = 5) {
 }
 
 /**
- * Obtiene datos de tracks de Spotify usando el endpoint BATCH /tracks?ids=...
- * Máximo 50 IDs por petición → drásticamente menos llamadas que pedir 1 a 1.
- * Respeta el rate limiter global (SpotifyRL) antes de cada petición.
+ * Muestra un aviso visual amigable cuando el token de Spotify expiró.
+ * El token de Spotify dura ~1 hora; el usuario debe re-autenticarse con OAuth.
  */
-async function fetchTracksFromSpotify(ids, token) {
-    // Filtrar los que no están en caché en memoria ni en localStorage
+function showTokenExpiredUI() {
+    const reloginBtn = `
+        <div class="flex flex-col items-center gap-3 py-6 text-center">
+            <svg class="w-10 h-10 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <p class="text-neutral-400 text-sm">Tu sesión de Spotify expiró (tokens duran ~1 hora).</p>
+            <a href="index.html"
+               class="mt-1 bg-[#1DB954] text-black text-sm font-bold px-5 py-2 rounded-full hover:bg-[#1ed760] transition-colors">
+                Volver a conectar Spotify
+            </a>
+        </div>`;
+
+    const els = ['recent-tracks-list', 'card-top-today', 'card-top-week'];
+    els.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = reloginBtn;
+    });
+
+/**
+ * Obtiene datos de tracks de Spotify usando el endpoint BATCH /tracks?ids=...
+ * Usa TokenManager para obtener/refrescar el token automáticamente.
+ * Reintenta UNA VEZ si recibe 401/403 (token expirado).
+ */
+async function fetchTracksFromSpotify(ids) {
+    // Filtrar los que ya están en caché
     const missingIds = ids.filter(id => {
         if (globalStats.spotifyCache[id]) return false;
         try {
@@ -134,23 +134,22 @@ async function fetchTracksFromSpotify(ids, token) {
 
     if (missingIds.length === 0) return;
 
-    // Verificar si estamos bloqueados por rate limit
+    // Verificar rate limit
     if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) {
         const waitMs = SpotifyRL.msUntilUnblock();
-        console.warn(`⏳ Rate limit activo. Esperando ${Math.ceil(waitMs / 1000)}s antes de pedir tracks.`);
+        console.warn(`⏳ Rate limit activo. Esperando ${Math.ceil(waitMs / 1000)}s.`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
     }
 
-    // Dividir en bloques de 50 (límite del endpoint batch de Spotify)
     const BATCH_SIZE = 50;
     for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
         const batch = missingIds.slice(i, i + BATCH_SIZE);
 
-        // Verificar rate limit antes de cada batch
-        if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) {
-            console.warn('⏳ Rate limit activo, abortando peticiones de tracks.');
-            break;
-        }
+        if (typeof SpotifyRL !== 'undefined' && !SpotifyRL.canRequest()) break;
+
+        // Obtener token válido (refresca si es necesario)
+        const token = _session ? await TokenManager.getToken(_session) : TokenManager.getCached();
+        if (!token) { showTokenExpiredUI(); break; }
 
         try {
             const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
@@ -162,27 +161,41 @@ async function fetchTracksFromSpotify(ids, token) {
                 (data.tracks || []).forEach(trackData => {
                     if (!trackData) return;
                     globalStats.spotifyCache[trackData.id] = trackData;
-                    try {
-                        localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData));
-                    } catch(e) {} // Ignorar quota exceeded
+                    try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
                 });
-            } else if (res.status === 401 || res.status === 400) {
-                console.warn(`Token expirado al pedir tracks.`);
-                break;
-            } else if (res.status === 429) {
-                if (typeof SpotifyRL !== 'undefined') {
-                    SpotifyRL.register429(res);
+            } else if (res.status === 401 || res.status === 400 || res.status === 403) {
+                console.warn(`🔒 Token inválido (${res.status}). Intentando refresh automático...`);
+                TokenManager.invalidate();
+                if (!_session) { showTokenExpiredUI(); break; }
+
+                const newToken = await TokenManager.refresh(_session);
+                if (!newToken) { showTokenExpiredUI(); break; }
+
+                // Reintentar este batch con el token nuevo
+                const retry = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
+                    headers: { 'Authorization': `Bearer ${newToken}` }
+                });
+                if (retry.ok) {
+                    const data = await retry.json();
+                    (data.tracks || []).forEach(trackData => {
+                        if (!trackData) return;
+                        globalStats.spotifyCache[trackData.id] = trackData;
+                        try { localStorage.setItem('spotify_track_' + trackData.id, JSON.stringify(trackData)); } catch(e) {}
+                    });
+                } else {
+                    showTokenExpiredUI(); break;
                 }
-                console.error('🚨 LÍMITE DE SPOTIFY 429 🚨 - Abortando batch de tracks.');
+            } else if (res.status === 429) {
+                if (typeof SpotifyRL !== 'undefined') SpotifyRL.register429(res);
+                console.error('🚨 429 - Abortando batch de tracks.');
                 break;
             }
 
-            // Pequeña pausa entre batches para no saturar (solo si hay más batches)
             if (i + BATCH_SIZE < missingIds.length) {
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch(e) {
-            console.error("Error en batch de tracks:", e);
+            console.error('Error en batch de tracks:', e);
         }
     }
 }
@@ -235,7 +248,7 @@ function getTimeAgo(date) {
 }
 
 // Lógica de Modales
-function setupModals(token) {
+function setupModals() {
     const listModal = document.getElementById('list-modal');
     const modalContent = document.getElementById('list-modal-content');
     const modalTitle = document.getElementById('list-modal-title');
@@ -269,7 +282,7 @@ function setupModals(token) {
         openModal('Historial Completo', 'Tus últimas 20 canciones escuchadas');
 
         const idsToFetch = globalStats.recent.map(s => s.track_id);
-        await fetchTracksFromSpotify(idsToFetch, token);
+        await fetchTracksFromSpotify(idsToFetch);
 
         modalBody.innerHTML = '';
         renderRecentList(globalStats.recent, 'list-modal-body');

@@ -206,8 +206,9 @@
     </div>
 
     <script src="js/config.js"></script>
-    <!-- ⚠️ Cargamos el rate limiter ANTES de tracking y dashboard_stats -->
+    <!-- ⚠️ Cargamos el rate limiter y token manager ANTES de tracking y dashboard_stats -->
     <script src="js/rate_limiter.js"></script>
+    <script src="js/token_manager.js"></script>
     <script src="js/tracking.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {

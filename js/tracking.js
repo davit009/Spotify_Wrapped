@@ -12,16 +12,8 @@ async function checkCurrentlyPlaying() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
 
-    // Intentar token de sesión primero, luego la BD
-    let token = session.provider_token || null;
-    if (!token) {
-        try {
-            const { data: userData, error: tokenErr } = await supabaseClient
-                .from('users').select('spotify_access_token').eq('id', session.user.id).single();
-            if (!tokenErr) token = userData?.spotify_access_token || null;
-        } catch (e) { /* red sin disponibilidad, silencioso */ }
-    }
-
+    // Obtener token válido a través de TokenManager (refresca automáticamente si es necesario)
+    const token = typeof TokenManager !== 'undefined' ? await TokenManager.getToken(session) : session.provider_token;
     if (!token) return;
 
     try {
@@ -31,10 +23,10 @@ async function checkCurrentlyPlaying() {
         });
 
         // Si el token de Spotify expiró (dura 1 hora), parar el tracking silenciosamente
-        // NO redirigir: eso destruiría la sesión del usuario en medio de la navegación
-        if ((response.status === 401 || response.status === 400) && !isReauthenticatingTracking) {
+        // 401/400 = expirado, 403 = inválido/sin permisos. No redirigir: destruiría la sesión.
+        if ((response.status === 401 || response.status === 400 || response.status === 403) && !isReauthenticatingTracking) {
             isReauthenticatingTracking = true;
-            console.warn("Token de Spotify expirado. El rastreo se pausará hasta la próxima sesión.");
+            console.warn(`Token de Spotify expirado o inválido (HTTP ${response.status}). El rastreo se pausará hasta la próxima sesión.`);
             hideNowPlaying();
             return;
         }
@@ -109,15 +101,10 @@ async function saveTrackToDB(trackInfo, userId) {
 async function getSpotifyToken() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return null;
-    let token = session.provider_token || null;
-    if (!token) {
-        try {
-            const { data: userData } = await supabaseClient
-                .from('users').select('spotify_access_token').eq('id', session.user.id).single();
-            token = userData?.spotify_access_token || null;
-        } catch (e) { }
+    if (typeof TokenManager !== 'undefined') {
+        return await TokenManager.getToken(session);
     }
-    return token;
+    return session.provider_token || null;
 }
 
 async function spotifyPlayerAction(action, method = 'POST') {
@@ -234,8 +221,7 @@ function hideNowPlaying() {
 
 async function syncOfflineHistory(session) {
     try {
-        const { data: userData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', session.user.id).single();
-        const token = userData?.spotify_access_token || session.provider_token;
+        const token = typeof TokenManager !== 'undefined' ? await TokenManager.getToken(session) : session.provider_token;
         if (!token) return;
 
         const { data: lastSession } = await supabaseClient
@@ -253,7 +239,18 @@ async function syncOfflineHistory(session) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!response.ok) return;
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                if (typeof TokenManager !== 'undefined') {
+                    TokenManager.invalidate();
+                    // Refresca para el próximo tick
+                    TokenManager.refresh(session);
+                }
+            } else if (response.status === 429) {
+                if (typeof SpotifyRL !== 'undefined') SpotifyRL.register429(response);
+            }
+            return;
+        }
         const data = await response.json();
         if (data.items && data.items.length > 0) {
             const sessionsToInsert = data.items.map(item => {
