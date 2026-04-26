@@ -192,6 +192,21 @@ async function fetchTracksFromSpotify(ids) {
                 } else {
                     const errText = await retry.text();
                     console.error('Spotify retry falló con status:', retry.status, 'Detalle:', errText);
+                    
+                    // SUPER DEBUG: ¿Podemos al menos ver quién soy?
+                    const meRes = await fetch('https://api.spotify.com/v1/me', {
+                        headers: { 'Authorization': `Bearer ${newToken}` }
+                    });
+                    if (meRes.ok) {
+                        const meData = await meRes.json();
+                        console.log('✅ El token SÍ funciona para el perfil:', meData.id, meData.email);
+                        console.warn('⚠️ El problema es ESPECÍFICO del endpoint de canciones. Posible restricción de Spotify a apps nuevas.');
+                    } else {
+                        const meErr = await meRes.text();
+                        console.error('❌ El token tampoco funciona para el perfil. Detalle:', meErr);
+                        console.error('🔥 Tu App o tu IP están completamente bloqueadas por Spotify.');
+                    }
+
                     showTokenExpiredUI(); break;
                 }
             } else if (res.status === 429) {
