@@ -112,6 +112,7 @@ function showTokenExpiredUI() {
         const el = document.getElementById(id);
         if (el) el.innerHTML = reloginBtn;
     });
+}
 
 /**
  * Obtiene datos de tracks de Spotify usando el endpoint BATCH /tracks?ids=...
