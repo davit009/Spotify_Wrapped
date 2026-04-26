@@ -13,80 +13,92 @@
         .bg-card { background-color: #1a1a1a; }
         .spotify-green { color: #1DB954; }
         .bg-spotify-green { background-color: #1DB954; }
+        .text-gradient { background: linear-gradient(to right, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         
-        .win-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
+        .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+
+        .win-line { height: 4px; border-radius: 2px; flex: 1; transition: all 0.3s ease; }
         .win-user { background: #1DB954; box-shadow: 0 0 10px #1DB954; }
         .win-friend { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
-        
-        .avatar-fallback { background: linear-gradient(135deg, #333, #222); display: flex; items-center: center; justify-content: center; font-weight: 900; color: #fff; border: 2px solid rgba(255,255,255,0.1); }
+        .win-none { background: rgba(255,255,255,0.05); }
+
+        .avatar-fallback { background: linear-gradient(135deg, #333, #222); display: flex; align-items: center; justify-content: center; font-weight: 900; color: #fff; border: 2px solid rgba(255,255,255,0.1); }
         .streak-fire { filter: drop-shadow(0 0 12px #ff4d00); animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
     </style>
 </head>
-<body class="min-h-screen p-4 sm:p-10 flex flex-col items-center">
+<body class="min-h-screen p-4 sm:p-6 flex flex-col items-center">
     
-    <!-- HEADER -->
-    <header class="w-full max-w-6xl flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
-        <div class="flex items-center gap-4">
-            <div class="w-12 h-12 bg-spotify-green rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.3)]">
-                <svg class="w-7 h-7 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <!-- HEADER COMPLETO (Restaurado) -->
+    <header class="w-full max-w-6xl flex items-center justify-between mb-10 gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-spotify-green rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
+                <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
             </div>
-            <nav class="flex items-center gap-6 bg-[#1a1a1a] px-6 py-3 rounded-full border border-white/5">
-                <a href="dashboard.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Música</a>
-                <a href="social.html" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Social</a>
-                <a href="profile.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Historial</a>
-            </nav>
+            <h1 class="text-xl font-black tracking-tighter hidden sm:block">Arena</h1>
         </div>
-        <div class="flex items-center gap-4">
-            <div class="flex gap-1 bg-[#1a1a1a] p-1 rounded-full border border-white/5">
-                <button id="filter-today" class="px-5 py-2 text-[9px] font-black uppercase rounded-full bg-spotify-green text-black">Hoy</button>
-                <button id="filter-week" class="px-5 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Semana</button>
-                <button id="filter-month" class="px-5 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Mes</button>
+
+        <nav class="flex items-center gap-4 bg-[#1a1a1a] px-5 py-2.5 rounded-full border border-white/5">
+            <a href="dashboard.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Música</a>
+            <a href="social.html" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Social</a>
+            <a href="profile.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Historial</a>
+        </nav>
+
+        <div class="relative">
+            <button id="profile-btn" class="flex items-center gap-3 bg-[#1a1a1a] p-1 pr-4 rounded-full border border-white/5">
+                <img id="user-avatar" src="" class="w-8 h-8 rounded-full bg-neutral-800 object-cover">
+                <span id="user-name" class="text-xs font-bold truncate max-w-[80px]">...</span>
+            </button>
+            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
+                <button id="logout-btn" class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl transition-colors">Cerrar Sesión</button>
             </div>
-            <button id="add-friend-btn" class="px-6 py-3 bg-spotify-green text-black font-black text-xs rounded-full hover:scale-105 transition-all shadow-lg">Buscar Amigos</button>
         </div>
     </header>
 
     <main class="w-full max-w-6xl">
-        <h2 class="text-3xl font-black italic mb-8 tracking-tighter">Arena</h2>
+        <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
+            <div>
+                <h2 class="text-4xl font-black italic tracking-tighter text-gradient">Arena Duo</h2>
+                <p class="text-neutral-500 text-xs font-bold uppercase tracking-widest mt-1">Duelo de Titanes</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex gap-1 bg-[#1a1a1a] p-1 rounded-full border border-white/5">
+                    <button id="filter-today" class="px-5 py-2 text-[9px] font-black uppercase rounded-full bg-spotify-green text-black transition-all">Hoy</button>
+                    <button id="filter-week" class="px-5 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white transition-all">Semana</button>
+                    <button id="filter-month" class="px-5 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white transition-all">Mes</button>
+                </div>
+                <button id="add-friend-btn" class="px-6 py-3 bg-spotify-green text-black font-black text-xs rounded-full hover:scale-105 transition-all shadow-lg shadow-green-500/10">Amigos</button>
+            </div>
+        </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-8 items-start">
-            
-            <!-- COLUMNA IZQUIERDA: TARJETA DE BATALLA -->
-            <div id="arena-main-container" class="w-full flex justify-center">
+            <div id="arena-main-container" class="w-full">
                 <!-- Se inyectará por JS -->
-                <div class="bg-card w-full rounded-[3rem] p-12 text-center border border-white/5 animate-pulse">
-                    <p class="text-neutral-500 italic">Cargando duelo...</p>
-                </div>
             </div>
 
-            <!-- COLUMNA DERECHA: INFO SECUNDARIA -->
             <div class="flex flex-col gap-6">
                 <!-- MODO RACHA -->
-                <div id="streak-card" class="bg-card p-10 rounded-[3rem] border border-orange-500/10 flex flex-col items-center text-center group">
-                    <div class="text-6xl mb-6 streak-fire">🔥</div>
-                    <h3 class="text-[10px] font-black uppercase text-orange-500 mb-2 tracking-widest">Modo Racha</h3>
-                    <p class="text-3xl font-black italic mb-2"><span id="streak-days">0</span> DÍAS</p>
-                    <p class="text-[11px] text-neutral-500 font-medium max-w-[200px]">Vas dominando la arena. ¡No dejes que se apague!</p>
+                <div id="streak-card" class="bg-card p-10 rounded-[3rem] border border-orange-500/10 flex flex-col items-center text-center group relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent"></div>
+                    <div class="text-6xl mb-6 streak-fire relative z-10">🔥</div>
+                    <h3 class="text-[10px] font-black uppercase text-orange-500 mb-2 tracking-widest relative z-10">Racha Actual</h3>
+                    <p class="text-4xl font-black italic mb-2 relative z-10 tracking-tighter"><span id="streak-days">0</span> DÍAS</p>
+                    <p class="text-[11px] text-neutral-500 font-medium max-w-[200px] relative z-10">¡Dominando la Arena!</p>
                 </div>
 
                 <!-- MATCH MUSICAL -->
-                <div id="match-card" class="bg-card p-10 rounded-[3rem] border border-[#1DB954]/10 flex flex-col items-center text-center hidden">
-                    <div class="text-5xl mb-6">🎵</div>
-                    <h3 class="text-[10px] font-black uppercase text-[#1DB954] mb-2 tracking-widest">Match Musical</h3>
-                    <p class="text-2xl font-black italic"><span id="match-count">0</span> COMUNES</p>
-                    <p class="text-[11px] text-neutral-500 mt-2">Canciones en común hoy</p>
-                </div>
-
-                <!-- ESPACIO PARA FUTURAS CARDS -->
-                <div class="bg-card p-10 rounded-[3rem] border border-white/5 border-dashed opacity-30 flex items-center justify-center">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-neutral-500">Más estadísticas próximamente</p>
+                <div id="match-card" class="bg-card p-10 rounded-[3rem] border border-[#1DB954]/10 flex flex-col items-center text-center hidden relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent"></div>
+                    <div class="text-5xl mb-6 relative z-10">🎵</div>
+                    <h3 class="text-[10px] font-black uppercase text-[#1DB954] mb-2 tracking-widest relative z-10">En Sintonía</h3>
+                    <p class="text-2xl font-black italic relative z-10 tracking-tighter"><span id="match-count">0</span> CANCIONES</p>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- MODAL DE AMIGOS (IGUAL QUE ANTES PERO CON ESTILO #1a1a1a) -->
+    <!-- MODAL DE AMIGOS -->
     <div id="friend-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[300] hidden flex items-center justify-center p-4">
         <div class="bg-[#1a1a1a] p-10 rounded-[3.5rem] border border-white/5 w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-8">
@@ -111,10 +123,29 @@
     <script type="module">
         import { supabaseClient } from './js/supabase.js';
         import { initSocial, loadSocialPage } from './js/social.js';
+        
         async function bootstrap() {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) { initSocial(session.user); loadSocialPage(session.user.id); }
-            else { window.location.href = 'index.html'; }
+            if (session) {
+                const user = session.user;
+                // Cargar datos en el header
+                document.getElementById('user-name').textContent = user.user_metadata.display_name || user.email.split('@')[0];
+                document.getElementById('user-avatar').src = user.user_metadata.avatar_url || '';
+                
+                // Dropdown logic
+                const btn = document.getElementById('profile-btn');
+                const menu = document.getElementById('profile-dropdown');
+                btn.onclick = () => menu.classList.toggle('active');
+                document.getElementById('logout-btn').onclick = async () => {
+                    await supabaseClient.auth.signOut();
+                    window.location.href = 'index.html';
+                };
+
+                initSocial(user);
+                loadSocialPage(user.id);
+            } else {
+                window.location.href = 'index.html';
+            }
         }
         bootstrap();
     </script>
