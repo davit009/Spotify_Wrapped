@@ -1,7 +1,6 @@
 import { supabaseClient } from './supabase.js';
 
 let activeChallenges = [];
-let currentIndex = 0;
 
 /**
  * Inicializa la lógica social
@@ -29,14 +28,12 @@ export async function initSocial(currentUser) {
     }
 
     loadPendingRequests(currentUser.id);
-    setupCarouselNav();
 }
 
 /**
  * Carga el contenido dinámico de la página Social
  */
 export async function loadSocialPage(userId) {
-    // 1. Obtener Dúos Activos (Aceptados)
     const { data: challenges } = await supabaseClient
         .from('challenges')
         .select(`*, creator:creator_id (display_name, avatar_url), opponent:opponent_id (display_name, avatar_url)`)
@@ -47,10 +44,11 @@ export async function loadSocialPage(userId) {
     activeChallenges = challenges || [];
     renderArenaCarousel(userId);
     loadCommonTracks(userId);
+    renderLeaders(userId);
 }
 
 /**
- * Renderiza el carrusel de comparativas (La Arena)
+ * Renderiza el carrusel de comparativas
  */
 async function renderArenaCarousel(userId) {
     const container = document.getElementById('arena-carousel');
@@ -59,11 +57,8 @@ async function renderArenaCarousel(userId) {
     if (activeChallenges.length === 0) {
         container.innerHTML = `
             <div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-center">
-                <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                    <svg class="w-10 h-10 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                </div>
-                <h3 class="text-xl font-black italic text-white mb-2">No tienes duelos activos</h3>
-                <p class="text-sm text-neutral-500 max-w-xs mx-auto">Busca a un amigo en el menú de perfil para empezar a comparar vuestra música.</p>
+                <h3 class="text-xl font-black italic text-white mb-2">Sin duelos activos</h3>
+                <p class="text-xs text-neutral-500">Invita a alguien desde tu perfil para empezar.</p>
             </div>
         `;
         return;
@@ -75,7 +70,6 @@ async function renderArenaCarousel(userId) {
         const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
         const opponentId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
 
-        // Cálculos de tiempo hoy
         const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
         const actualStart = new Date(ch.start_date);
         const dayFilter = new Date(Math.max(startOfToday, actualStart)).toISOString();
@@ -85,122 +79,131 @@ async function renderArenaCarousel(userId) {
             getListeningTime(opponentId, dayFilter)
         ]);
 
-        const total = myTime + friendTime || 1;
-        const myPercent = (myTime / total) * 100;
-        const friendPercent = (friendTime / total) * 100;
-
         const myMins = Math.floor(myTime / 60000);
         const friendMins = Math.floor(friendTime / 60000);
+        
+        // Lógica de barra y color
+        const isWinning = myTime >= friendTime;
+        const barColor = isWinning ? '#1DB954' : '#ef4444';
+        
+        // Calculamos el porcentaje relativo (quién lleva más del total entre los dos)
+        const total = myTime + friendTime || 1;
+        const myPercent = (myTime / total) * 100;
 
         const card = document.createElement('div');
-        card.className = "arena-card glass rounded-[3rem] p-8 sm:p-12 flex flex-col gap-10 relative overflow-hidden";
+        card.className = "arena-card glass rounded-[3rem] p-10 flex flex-col gap-8 relative overflow-hidden";
         card.innerHTML = `
-            <div class="flex justify-between items-center relative z-10">
+            <div class="flex justify-between items-center relative z-10 px-4">
                 <div class="flex flex-col items-center gap-4 flex-1">
-                    <img src="${localStorage.getItem('user_avatar') || ''}" class="w-20 h-20 rounded-full border-4 border-white/5 shadow-2xl user-avatar-placeholder">
+                    <img src="${localStorage.getItem('user_avatar') || ''}" class="w-16 h-16 rounded-full border-4 border-white/5 shadow-2xl user-avatar-placeholder">
                     <div class="text-center">
-                        <p class="text-xs font-black uppercase tracking-widest text-[#1DB954]">Tú</p>
-                        <p class="text-3xl font-black italic">${myMins}<span class="text-sm font-normal text-neutral-500 ml-1">min</span></p>
+                        <p class="text-2xl font-black italic">${myMins}<span class="text-[10px] font-normal opacity-50 ml-1">m</span></p>
                     </div>
                 </div>
 
-                <div class="flex flex-col items-center gap-2">
-                    <div class="px-4 py-1 bg-white/5 rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest text-neutral-500">VS</div>
-                    <div class="h-12 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
+                <div class="flex flex-col items-center px-4">
+                    <div class="text-[10px] font-black opacity-20 uppercase tracking-widest">VS</div>
                 </div>
 
                 <div class="flex flex-col items-center gap-4 flex-1">
-                    <img src="${otherUser.avatar_url || 'https://www.gravatar.com/avatar/0?d=mp'}" class="w-20 h-20 rounded-full border-4 border-white/5 shadow-2xl">
+                    <img src="${otherUser.avatar_url || ''}" class="w-16 h-16 rounded-full border-4 border-white/5 shadow-2xl">
                     <div class="text-center">
-                        <p class="text-xs font-black uppercase tracking-widest text-neutral-400">${otherUser.display_name}</p>
-                        <p class="text-3xl font-black italic">${friendMins}<span class="text-sm font-normal text-neutral-500 ml-1">min</span></p>
+                        <p class="text-2xl font-black italic">${friendMins}<span class="text-[10px] font-normal opacity-50 ml-1">m</span></p>
                     </div>
                 </div>
             </div>
 
-            <div class="space-y-4 relative z-10">
-                <div class="flex justify-between text-[10px] font-black uppercase tracking-widest text-neutral-500 px-2">
-                    <span>Tu Ritmo</span>
-                    <span>Su Ritmo</span>
+            <div class="space-y-4 px-4">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill shadow-[0_0_20px_rgba(29,185,84,0.2)]" style="width: ${myPercent}%; background-color: ${barColor}"></div>
                 </div>
-                <div class="progress-bar-bg flex">
-                    <div class="progress-bar-fill bg-[#1DB954] shadow-[0_0_15px_rgba(29,185,84,0.3)]" style="width: ${myPercent}%"></div>
-                    <div class="progress-bar-fill bg-white/10" style="width: ${friendPercent}%"></div>
-                </div>
-                <p class="text-center text-sm font-black italic text-white pt-4">
-                    ${myTime > friendTime ? '¡Vas liderando hoy!' : myTime < friendTime ? otherUser.display_name + ' te va ganando' : '¡Empate técnico!'}
+                <p class="text-center text-[10px] font-black uppercase tracking-[0.2em] ${isWinning ? 'text-[#1DB954]' : 'text-red-500'}">
+                    ${isWinning ? '¡Vas ganando hoy!' : 'Te van ganando'}
                 </p>
             </div>
 
-            <div class="absolute top-4 right-4">
-                <button class="cancel-duel-btn p-3 text-neutral-700 hover:text-red-500 transition-colors" title="Cancelar Duelo">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
+            <button class="cancel-duel-btn absolute top-6 right-6 text-neutral-800 hover:text-red-500 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
         `;
         container.appendChild(card);
         
         card.querySelector('.cancel-duel-btn').addEventListener('click', () => {
-            if(confirm("¿Seguro que quieres terminar este duelo anual?")) respondChallenge(ch.id, 'finished', userId);
+            if(confirm("¿Cancelar este duelo anual?")) respondChallenge(ch.id, 'finished', userId);
         });
     }
 
-    // Actualizar avatares propios que falten
+    // Fix avatares propios
     document.querySelectorAll('.user-avatar-placeholder').forEach(img => {
         const globalAvatar = document.getElementById('user-avatar')?.src;
         if (globalAvatar) img.src = globalAvatar;
     });
 }
 
-function setupCarouselNav() {
-    const container = document.getElementById('arena-carousel');
-    document.getElementById('prev-duel')?.addEventListener('click', () => {
-        container.scrollBy({ left: -container.offsetWidth, behavior: 'smooth' });
-    });
-    document.getElementById('next-duel')?.addEventListener('click', () => {
-        container.scrollBy({ left: container.offsetWidth, behavior: 'smooth' });
-    });
+/**
+ * Renderiza los marcadores de líder con la regla de los 7 días
+ */
+async function renderLeaders(userId) {
+    const container = document.getElementById('leader-cards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (activeChallenges.length === 0) return;
+
+    const ch = activeChallenges[0];
+    const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
+    const opponentId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
+
+    // Día
+    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+    const dayFilter = new Date(Math.max(startOfToday, new Date(ch.start_date))).toISOString();
+    const [myDay, friendDay] = await Promise.all([getListeningTime(userId, dayFilter), getListeningTime(opponentId, dayFilter)]);
+    
+    container.innerHTML += renderLeaderCard('Líder del Día', otherUser, myDay, friendDay);
+
+    // Semana (Solo si el duelo tiene > 7 días)
+    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    const challengeAgeDays = (Date.now() - new Date(ch.start_date)) / (1000 * 60 * 60 * 24);
+
+    if (challengeAgeDays >= 7) {
+        const weekFilter = new Date(Math.max(weekAgo, new Date(ch.start_date))).toISOString();
+        const [myWeek, friendWeek] = await Promise.all([getListeningTime(userId, weekFilter), getListeningTime(opponentId, weekFilter)]);
+        container.innerHTML += renderLeaderCard('Líder de la Semana', otherUser, myWeek, friendWeek);
+    }
 }
 
-/**
- * Carga las solicitudes PENDIENTES recibidas
- */
+function renderLeaderCard(title, otherUser, myTime, friendTime) {
+    const isWinning = myTime >= friendTime;
+    const diffMins = Math.floor(Math.abs(myTime - friendTime) / 60000);
+    return `
+        <div class="glass p-6 rounded-[2rem] flex items-center gap-4">
+            <img src="${otherUser.avatar_url || ''}" class="w-10 h-10 rounded-full border-2 ${isWinning ? 'border-[#1DB954]' : 'border-red-500'}">
+            <div class="flex-1 min-w-0">
+                <h4 class="text-[10px] font-black uppercase text-neutral-500 tracking-widest mb-1">${title}</h4>
+                <p class="text-sm font-bold text-white truncate">${isWinning ? '¡Vas ganando!' : otherUser.display_name + ' lidera'}</p>
+                <p class="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">${diffMins} min de ventaja</p>
+            </div>
+        </div>
+    `;
+}
+
 async function loadPendingRequests(userId) {
     const container = document.getElementById('container-requests');
     const badge = document.getElementById('request-badge-count');
     const dot = document.getElementById('request-dot');
-
-    const { data: requests } = await supabaseClient
-        .from('challenges').select(`*, creator:creator_id (display_name, avatar_url)`)
-        .eq('opponent_id', userId).eq('status', 'pending');
-
+    const { data: requests } = await supabaseClient.from('challenges').select(`*, creator:creator_id (display_name, avatar_url)`).eq('opponent_id', userId).eq('status', 'pending');
     if (requests && requests.length > 0) {
-        badge.textContent = requests.length;
-        badge.classList.remove('hidden');
-        dot.classList.remove('hidden');
+        badge.textContent = requests.length; badge.classList.remove('hidden'); dot.classList.remove('hidden');
         container.innerHTML = '';
         requests.forEach(req => {
             const div = document.createElement('div');
             div.className = "p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between";
-            div.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <img src="${req.creator.avatar_url || ''}" class="w-10 h-10 rounded-full">
-                    <div><h4 class="text-sm font-bold text-white">${req.creator.display_name}</h4><p class="text-[9px] text-amber-500 uppercase font-black tracking-widest">Nueva Invitación</p></div>
-                </div>
-                <div class="flex gap-2">
-                    <button class="accept-btn bg-[#1DB954] text-black text-[10px] font-black py-2 px-4 rounded-full">Aceptar</button>
-                    <button class="decline-btn p-2 text-neutral-600 hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                </div>
-            `;
+            div.innerHTML = `<div class="flex items-center gap-3"><img src="${req.creator.avatar_url || ''}" class="w-10 h-10 rounded-full"><div><h4 class="text-sm font-bold text-white">${req.creator.display_name}</h4><p class="text-[9px] text-amber-500 uppercase font-black tracking-widest">Invitación</p></div></div><div class="flex gap-2"><button class="accept-btn bg-[#1DB954] text-black text-[10px] font-black py-2 px-4 rounded-full">Aceptar</button><button class="decline-btn p-2 text-neutral-600 hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button></div>`;
             container.appendChild(div);
             div.querySelector('.accept-btn').addEventListener('click', () => respondChallenge(req.id, 'active', userId));
             div.querySelector('.decline-btn').addEventListener('click', () => respondChallenge(req.id, 'declined', userId));
         });
-    } else {
-        badge.classList.add('hidden');
-        dot.classList.add('hidden');
-        container.innerHTML = '<p class="text-center text-neutral-600 text-xs py-10 italic">No hay solicitudes.</p>';
-    }
+    } else { badge.classList.add('hidden'); dot.classList.add('hidden'); container.innerHTML = '<p class="text-center text-neutral-600 text-xs py-10 italic">No hay solicitudes.</p>'; }
 }
 
 async function respondChallenge(challengeId, status, userId) {
@@ -247,23 +250,14 @@ function renderSearchResults(users, currentUserId) {
     users.forEach(user => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5";
-        div.innerHTML = `
-            <div class="flex items-center gap-3">
-                <img src="${user.avatar_url || ''}" class="w-10 h-10 rounded-full">
-                <span class="text-sm font-bold text-white">${user.display_name}</span>
-            </div>
-            <button class="challenge-btn bg-[#1DB954] text-black text-[10px] font-black py-2 px-4 rounded-full">Retar</button>
-        `;
+        div.innerHTML = `<div class="flex items-center gap-3"><img src="${user.avatar_url || ''}" class="w-10 h-10 rounded-full"><span class="text-sm font-bold text-white">${user.display_name}</span></div><button class="challenge-btn bg-[#1DB954] text-black text-[10px] font-black py-2 px-4 rounded-full">Retar</button>`;
         searchResults.appendChild(div);
         div.querySelector('.challenge-btn').addEventListener('click', () => createChallenge(user.id, currentUserId));
     });
 }
 
 async function createChallenge(opponentId, currentUserId) {
-    const start = new Date();
-    const end = new Date();
-    end.setFullYear(end.getFullYear() + 1); // <--- RETO ANUAL
+    const start = new Date(); const end = new Date(); end.setFullYear(end.getFullYear() + 1);
     const { error } = await supabaseClient.from('challenges').insert({ creator_id: currentUserId, opponent_id: opponentId, start_date: start.toISOString(), end_date: end.toISOString(), status: 'pending' });
-    if (error) alert("Invitación ya enviada.");
-    else alert("¡Reto anual enviado!");
+    if (error) alert("Invitación ya enviada."); else alert("¡Reto anual enviado!");
 }

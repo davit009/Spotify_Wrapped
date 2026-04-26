@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpotiStats | Mi Perfil</title>
+    <title>SpotiStats | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,6 +18,7 @@
         #album-bg.visible { opacity: 0.3; }
         .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
         .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+        .text-gradient { background: linear-gradient(to right, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
@@ -30,60 +31,38 @@
             </div>
             <h1 class="text-2xl font-black tracking-tighter">SpotiStats</h1>
         </div>
-        
         <nav class="flex items-center gap-6 bg-white/5 px-6 py-3 rounded-full border border-white/10 hidden md:flex">
             <a href="dashboard.html" class="text-xs font-black uppercase tracking-widest text-[#1DB954]">Música</a>
             <a href="social.html" class="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Social</a>
             <a href="profile.html" class="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Historial</a>
         </nav>
-
         <div class="relative">
             <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10 hover:bg-white/10 transition-all">
-                <img id="user-avatar" src="" class="w-9 h-9 rounded-full border border-white/10 bg-neutral-800" alt="Avatar">
+                <img id="user-avatar" src="" class="w-9 h-9 rounded-full border border-white/10 bg-neutral-800">
                 <span id="user-name" class="text-sm font-bold truncate max-w-[100px]">Cargando...</span>
-                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
             </button>
-
-            <!-- DROPDOWN DE PERFIL UNIFICADO -->
             <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-3 w-64 bg-[#121212] border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden p-2 z-[110]">
-                <div class="p-4 border-b border-white/5">
-                    <p class="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1">Mi Cuenta</p>
-                    <p id="user-email" class="text-xs text-neutral-400 truncate">...</p>
-                </div>
                 <div class="py-2">
-                    <a href="social.html" class="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-xl transition-colors group">
-                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20">
-                            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                        </div>
-                        <span class="text-sm font-bold">Amigos y Retos</span>
-                    </a>
-                    <button id="settings-trigger-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-xl transition-colors group">
-                        <div class="w-8 h-8 rounded-lg bg-neutral-500/10 flex items-center justify-center group-hover:bg-neutral-500/20">
-                            <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
-                        </div>
-                        <span class="text-sm font-bold">Configuración</span>
-                    </button>
+                    <a href="social.html" class="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-xl transition-colors font-bold text-sm">Amigos y Retos</a>
                     <div class="h-px bg-white/5 my-2"></div>
-                    <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 rounded-xl transition-colors group">
-                        <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20">
-                            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        </div>
-                        <span class="text-sm font-bold text-red-500">Cerrar Sesión</span>
-                    </button>
+                    <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 rounded-xl transition-colors text-red-500 font-bold text-sm">Cerrar Sesión</button>
                 </div>
             </div>
         </div>
     </header>
 
     <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-8">
-        <div class="flex flex-col gap-6">
+        
+        <!-- COLUMNA IZQUIERDA: REPRODUCCIÓN Y HISTORIAL -->
+        <div class="flex flex-col gap-6 order-2 lg:order-1">
             <div id="now-playing-card" class="relative group overflow-hidden rounded-[2.5rem] glass p-1 transition-all duration-700 hidden shadow-2xl">
                 <div class="flex flex-col sm:flex-row gap-6 p-6 relative z-10">
                     <div class="relative shrink-0 w-full sm:w-48 aspect-square rounded-3xl overflow-hidden shadow-2xl">
-                        <img id="np-image" src="" class="w-full h-full object-cover" alt="Album Art">
+                        <img id="np-image" src="" class="w-full h-full object-cover">
                     </div>
                     <div class="flex-1 min-w-0 flex flex-col justify-center">
-                        <div class="flex items-center justify-center sm:justify-start gap-2 mb-2">
+                        <div class="flex items-center gap-2 mb-2">
                             <span class="flex h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse"></span>
                             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-[#1DB954]">En Vivo</span>
                         </div>
@@ -102,43 +81,40 @@
                 </div>
             </div>
 
-            <div id="recent-history-card" class="glass p-8 rounded-[2.5rem] cursor-pointer hover:border-neutral-700 transition-all group">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-black flex items-center gap-3 text-white">
-                        <svg class="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Últimas escuchadas
-                    </h3>
-                </div>
+            <div id="recent-history-card" class="glass p-8 rounded-[2.5rem] cursor-pointer hover:border-neutral-700 transition-all group h-full">
+                <h3 class="text-2xl font-black flex items-center gap-3 text-white mb-6">
+                    <svg class="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Historial Reciente
+                </h3>
                 <div id="recent-tracks-list" class="space-y-4"></div>
             </div>
         </div>
 
-        <div class="flex flex-col gap-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div id="card-top-today" class="glass p-6 rounded-3xl min-h-[160px] flex flex-col justify-center relative overflow-hidden group cursor-pointer">
-                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Obsesión de Hoy</h3>
-                </div>
-                <div id="card-top-week" class="glass p-6 rounded-3xl min-h-[160px] flex flex-col justify-center relative overflow-hidden group cursor-pointer">
-                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Rey de la Semana</h3>
-                </div>
-                <div class="glass p-6 rounded-3xl flex flex-col items-center justify-center text-center sm:col-span-2">
-                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-1 tracking-widest">Tiempo Total en SpotiStats</h3>
-                    <p id="stats-total-hours" class="text-5xl font-black italic">0<span class="text-lg font-normal text-neutral-600 ml-1">h</span> 0<span class="text-lg font-normal text-neutral-600 ml-1">m</span></p>
-                </div>
+        <!-- COLUMNA DERECHA: TIEMPO Y TOPS -->
+        <div class="flex flex-col gap-6 order-1 lg:order-2">
+            <!-- TIEMPO TOTAL (PRIMER OBJETO Y MÁS ATRACTIVO) -->
+            <div class="glass p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-center relative overflow-hidden border-[#1DB954]/20">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-[#1DB954]/10 rounded-full blur-3xl"></div>
+                <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-2 tracking-widest relative z-10">Tiempo Total Escuchado</h3>
+                <p id="stats-total-hours" class="text-6xl font-black italic text-gradient tracking-tighter relative z-10">0<span class="text-lg font-normal opacity-50 ml-1">h</span> 0<span class="text-lg font-normal opacity-50 ml-1">m</span></p>
             </div>
-            
-            <div class="bg-[#181818] p-8 rounded-[2.5rem] border border-white/5">
-                <p class="text-xs text-neutral-500 leading-relaxed italic">"La música es la forma más fuerte de magia."</p>
+
+            <!-- TOPS GIGANTES -->
+            <div id="card-top-today" class="glass p-8 rounded-[2.5rem] min-h-[220px] flex flex-col justify-end relative overflow-hidden group cursor-pointer hover:border-[#1DB954]/40 transition-all">
+                <h3 class="text-[11px] font-black uppercase text-neutral-500 mb-4 tracking-widest absolute top-8 left-8">Tu Obsesión de Hoy</h3>
+            </div>
+
+            <div id="card-top-week" class="glass p-8 rounded-[2.5rem] min-h-[220px] flex flex-col justify-end relative overflow-hidden group cursor-pointer hover:border-[#1DB954]/40 transition-all">
+                <h3 class="text-[11px] font-black uppercase text-neutral-500 mb-4 tracking-widest absolute top-8 left-8">Rey de la Semana</h3>
             </div>
         </div>
     </main>
 
-    <!-- Modales -->
     <div id="list-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[200] hidden flex items-center justify-center p-4">
-        <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]" id="list-modal-content">
+        <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
             <div class="flex justify-between items-start mb-8 shrink-0">
                 <h2 id="list-modal-title" class="text-3xl font-black italic text-white text-[#1DB954]">Título</h2>
-                <button id="close-list-modal" class="bg-white/5 hover:bg-white/10 p-3 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button id="close-list-modal" class="bg-white/5 p-3 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div id="list-modal-body" class="overflow-y-auto pr-2 space-y-3 flex-1 custom-scrollbar"></div>
         </div>
@@ -150,38 +126,20 @@
         import { initDashboard } from './js/dashboard_stats.js';
         import { checkCurrentlyPlaying, syncOfflineHistory } from './js/tracking.js';
 
-        let initialized = false;
-
-        async function startDashboard(session) {
-            if (initialized) return;
-            initialized = true;
-            
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (session) {
-                const userMeta = session.user.user_metadata;
-                document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
-                document.getElementById('user-email').textContent = session.user.email;
-                if (userMeta.avatar_url) document.getElementById('user-avatar').src = userMeta.avatar_url;
-
+                document.getElementById('user-name').textContent = session.user.user_metadata.full_name || 'Usuario';
+                if (session.user.user_metadata.avatar_url) document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
                 await initDashboard(session);
                 syncOfflineHistory(session);
                 setInterval(() => checkCurrentlyPlaying(session), 10000);
+            } else {
+                window.location.href = 'index.html';
             }
-        }
-
-        supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (session) startDashboard(session);
-            else window.location.href = 'index.html';
         });
 
-        // Lógica de Dropdown
-        const profileBtn = document.getElementById('profile-btn');
         const dropdown = document.getElementById('profile-dropdown');
-        
-        profileBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dropdown.classList.toggle('active');
-        });
-
+        document.getElementById('profile-btn').addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('active'); });
         document.addEventListener('click', () => dropdown.classList.remove('active'));
         document.getElementById('logout-btn').addEventListener('click', () => supabaseClient.auth.signOut());
         document.getElementById('close-list-modal').addEventListener('click', () => document.getElementById('list-modal').classList.add('hidden'));

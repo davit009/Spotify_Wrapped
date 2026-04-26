@@ -15,21 +15,20 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
         
-        /* Dropdown */
         .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
         .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
         
-        /* Arena Carousel */
-        .arena-container { scroll-snap-type: x mandatory; display: flex; overflow-x: auto; gap: 2rem; scroll-behavior: smooth; }
+        /* Arena Carousel Mejorado */
+        .arena-container { scroll-snap-type: x mandatory; display: flex; overflow-x: auto; gap: 1rem; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+        .arena-container::-webkit-scrollbar { display: none; }
         .arena-card { min-width: 100%; scroll-snap-align: center; }
         
-        .progress-bar-bg { background: rgba(255,255,255,0.05); height: 12px; border-radius: 99px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        .progress-bar-bg { background: rgba(255,255,255,0.05); height: 16px; border-radius: 99px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.1); }
+        .progress-bar-fill { height: 100%; transition: all 1s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
     
-    <!-- HEADER UNIFICADO -->
     <header class="max-w-7xl mx-auto flex justify-between items-center mb-10 relative z-[100]">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
@@ -46,102 +45,68 @@
 
         <div class="relative">
             <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10 hover:bg-white/10 transition-all">
-                <img id="user-avatar" src="" class="w-9 h-9 rounded-full border border-white/10 bg-neutral-800" alt="Avatar">
+                <img id="user-avatar" src="" class="w-9 h-9 rounded-full border border-white/10 bg-neutral-800">
                 <span id="user-name" class="text-sm font-bold truncate max-w-[100px]">...</span>
                 <div id="request-dot" class="w-2 h-2 bg-[#1DB954] rounded-full absolute -top-1 -right-1 hidden"></div>
             </button>
-
-            <!-- DROPDOWN SOCIAL Y AJUSTES -->
             <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-3 w-72 bg-[#121212] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden p-2 z-[110]">
                 <div class="p-5 border-b border-white/5">
-                    <p class="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-4">Gestión Social</p>
-                    <button id="open-friends-modal" class="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all group">
-                        <span class="text-sm font-black italic">Buscar y Solicitudes</span>
-                        <div id="request-badge-count" class="bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full hidden">0</div>
-                    </button>
+                    <p class="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4">Gestión</p>
+                    <button id="open-friends-modal" class="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all font-bold italic text-sm">Amigos y Solicitudes <span id="request-badge-count" class="bg-[#1DB954] text-black text-[10px] px-2 py-0.5 rounded-full hidden">0</span></button>
                 </div>
                 <div class="p-2 space-y-1">
-                    <button id="invite-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-xl transition-colors">
-                        <svg class="w-4 h-4 text-[#1DB954]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 100 5.368m0-5.368l6.632-3.316m-6.632 6l6.632 3.316m0 0a3 3 0 100-5.368m0 5.368l6.632 3.316"></path></svg>
-                        <span class="text-sm font-bold">Copiar Invitación</span>
-                    </button>
-                    <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 rounded-xl transition-colors text-red-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        <span class="text-sm font-bold">Cerrar Sesión</span>
-                    </button>
+                    <button id="invite-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-xl transition-colors font-bold text-sm text-[#1DB954]">Copiar Invitación</button>
+                    <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 rounded-xl transition-colors text-red-500 font-bold text-sm">Cerrar Sesión</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
+    <main class="max-w-4xl mx-auto flex flex-col gap-10">
         
-        <!-- COLUMNA CENTRAL: LA ARENA -->
-        <div class="flex flex-col gap-8">
-            <div class="flex justify-between items-end px-4">
-                <div>
-                    <h2 class="text-4xl font-black italic">Arena Dúo</h2>
-                    <p class="text-[10px] text-neutral-500 uppercase font-black tracking-widest mt-1">Tu progreso contra tus amigos</p>
-                </div>
-                <div class="flex gap-2">
-                    <button id="prev-duel" class="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg></button>
-                    <button id="next-duel" class="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg></button>
-                </div>
-            </div>
-
-            <!-- Carrusel de Arena -->
-            <div id="arena-carousel" class="arena-container custom-scrollbar pb-4">
-                <!-- Se llenará con JS -->
-                <div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-neutral-600 italic">
-                    Cargando tus duelos...
-                </div>
+        <!-- COLUMNA CENTRAL: LA ARENA (ARRIBA DE TODO) -->
+        <div id="arena-carousel" class="arena-container pb-4">
+            <div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-neutral-600 italic">
+                Cargando duelos...
             </div>
         </div>
 
-        <!-- COLUMNA DERECHA: SOCIAL COMPACTO -->
-        <div class="flex flex-col gap-6">
-            
-            <!-- Marcadores Rápidos (Líderes) -->
-            <div id="leader-cards" class="grid grid-cols-1 gap-4">
-                <!-- Dinámico -->
+        <!-- SECCIÓN SECUNDARIA -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Marcadores Rápidos -->
+            <div id="leader-cards" class="flex flex-col gap-4">
+                <!-- Se llena con JS -->
             </div>
 
-            <!-- Historial en Común (Más pequeño) -->
-            <div class="glass p-6 rounded-[2.5rem] flex flex-col">
-                <h3 class="text-xs font-black uppercase text-neutral-500 mb-6 tracking-widest flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"></path></svg>
+            <!-- Match Musical -->
+            <div class="glass p-8 rounded-[2.5rem] flex flex-col">
+                <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-6 tracking-widest flex items-center gap-2">
+                    <svg class="w-4 h-4 text-[#1DB954]" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"></path></svg>
                     Match Musical
                 </h3>
                 <div id="common-tracks-list" class="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                    <p class="text-[10px] text-neutral-600 italic">Sin coincidencias hoy.</p>
+                    <p class="text-[10px] text-neutral-600 italic">Escuchen música para encontrar coincidencias.</p>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- MODAL DE AMIGOS (Desde el perfil) -->
+    <!-- MODAL AMIGOS -->
     <div id="friends-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh]">
             <div class="flex justify-between items-center mb-8">
                 <h2 class="text-3xl font-black italic">Amigos</h2>
-                <button id="close-friends-modal" class="bg-white/5 p-3 rounded-full hover:bg-white/10 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
+                <button id="close-friends-modal" class="bg-white/5 p-3 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
-            
             <div class="flex gap-6 mb-8 border-b border-white/5">
                 <button id="tab-btn-search" class="pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]">Buscar</button>
                 <button id="tab-btn-requests" class="pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">Solicitudes</button>
             </div>
-
             <div id="container-search" class="space-y-4 flex-1 overflow-hidden flex flex-col">
                 <input type="text" id="user-search-input" placeholder="Nombre..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm focus:border-[#1DB954] outline-none">
                 <div id="user-search-results" class="flex-1 overflow-y-auto custom-scrollbar space-y-2"></div>
             </div>
-
-            <div id="container-requests" class="hidden flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                <p class="text-center text-neutral-600 text-xs py-10 italic">No hay solicitudes.</p>
-            </div>
+            <div id="container-requests" class="hidden flex-1 overflow-y-auto custom-scrollbar space-y-3"></div>
         </div>
     </div>
 
@@ -154,45 +119,32 @@
             if (session) {
                 document.getElementById('user-name').textContent = session.user.user_metadata.full_name || 'Usuario';
                 if (session.user.user_metadata.avatar_url) document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
-                
                 initSocial(session.user);
                 loadSocialPage(session.user.id);
-            } else {
-                window.location.href = 'index.html';
-            }
+            } else { window.location.href = 'index.html'; }
         });
 
-        // UI Logic
         const dropdown = document.getElementById('profile-dropdown');
         document.getElementById('profile-btn').addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('active'); });
         document.addEventListener('click', () => dropdown.classList.remove('active'));
+        document.getElementById('open-friends-modal').addEventListener('click', () => { document.getElementById('friends-modal').classList.remove('hidden'); dropdown.classList.remove('active'); });
+        document.getElementById('close-friends-modal').addEventListener('click', () => document.getElementById('friends-modal').classList.add('hidden'));
 
-        const friendsModal = document.getElementById('friends-modal');
-        document.getElementById('open-friends-modal').addEventListener('click', () => { friendsModal.classList.remove('hidden'); dropdown.classList.remove('active'); });
-        document.getElementById('close-friends-modal').addEventListener('click', () => friendsModal.classList.add('hidden'));
-
-        // Tabs Modal
-        const btnSearch = document.getElementById('tab-btn-search');
-        const btnReq = document.getElementById('tab-btn-requests');
-        const contSearch = document.getElementById('container-search');
-        const contReq = document.getElementById('container-requests');
-
-        btnSearch.addEventListener('click', () => {
-            btnSearch.className = "pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]";
-            btnReq.className = "pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors";
-            contSearch.classList.remove('hidden'); contReq.classList.add('hidden');
+        document.getElementById('tab-btn-search').addEventListener('click', () => {
+            document.getElementById('tab-btn-search').className = "pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]";
+            document.getElementById('tab-btn-requests').className = "pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors";
+            document.getElementById('container-search').classList.remove('hidden');
+            document.getElementById('container-requests').classList.add('hidden');
         });
 
-        btnReq.addEventListener('click', () => {
-            btnReq.className = "pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]";
-            btnSearch.className = "pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors";
-            contReq.classList.remove('hidden'); contSearch.classList.add('hidden');
+        document.getElementById('tab-btn-requests').addEventListener('click', () => {
+            document.getElementById('tab-btn-requests').className = "pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]";
+            document.getElementById('tab-btn-search').className = "pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors";
+            document.getElementById('container-requests').classList.remove('hidden');
+            document.getElementById('container-search').classList.add('hidden');
         });
 
-        document.getElementById('invite-btn').addEventListener('click', () => {
-            navigator.clipboard.writeText(window.location.origin).then(() => alert("¡Enlace copiado!"));
-        });
-
+        document.getElementById('invite-btn').addEventListener('click', () => { navigator.clipboard.writeText(window.location.origin).then(() => alert("¡Copiado!")); });
         document.getElementById('logout-btn').addEventListener('click', () => supabaseClient.auth.signOut());
     </script>
 </body>
