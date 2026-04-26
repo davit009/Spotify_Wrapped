@@ -3,115 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arena Social | SpotiStats</title>
+    <title>Estadísticas | SpotiStats</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #fff; overflow-x: hidden; }
-        .bg-card { background-color: #1a1a1a; }
-        .spotify-green { color: #1DB954; }
-        .bg-spotify-green { background-color: #1DB954; }
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .text-gradient { background: linear-gradient(to right, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         
+        #album-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; filter: blur(100px) saturate(1.8); opacity: 0; transition: opacity 3s ease; background-size: cover; background-position: center; }
+        #album-bg.visible { opacity: 0.25; }
+
         .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
         .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
 
-        .win-line { height: 4px; border-radius: 2px; flex: 1; transition: all 0.3s ease; }
-        .win-user { background: #1DB954; box-shadow: 0 0 10px #1DB954; }
-        .win-friend { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        .win-line { height: 3px; border-radius: 2px; flex: 1; transition: all 0.3s ease; }
+        .win-user { background: #1DB954; box-shadow: 0 0 15px rgba(29, 185, 84, 0.5); }
+        .win-friend { background: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
         .win-none { background: rgba(255,255,255,0.05); }
 
-        .avatar-fallback { background: linear-gradient(135deg, #333, #222); display: flex; align-items: center; justify-content: center; font-weight: 900; color: #fff; border: 2px solid rgba(255,255,255,0.1); }
-        .streak-fire { filter: drop-shadow(0 0 12px #ff4d00); animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
+        .avatar-fallback { background: linear-gradient(135deg, #111, #222); display: flex; align-items: center; justify-content: center; font-weight: 900; color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+        .streak-fire { filter: drop-shadow(0 0 15px #ff4d00); animation: flicker 3s infinite ease-in-out; }
+        @keyframes flicker { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.05); } }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-6 flex flex-col items-center">
     
-    <!-- HEADER COMPLETO (Restaurado) -->
-    <header class="w-full max-w-6xl flex items-center justify-between mb-10 gap-4">
+    <div id="album-bg"></div>
+
+    <header class="w-full max-w-6xl flex items-center justify-between mb-12 gap-4 relative z-10">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-spotify-green rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
+            <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.4)]">
                 <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
             </div>
-            <h1 class="text-xl font-black tracking-tighter hidden sm:block">Arena</h1>
+            <h1 class="text-xl font-black tracking-tighter">Estadísticas</h1>
         </div>
 
-        <nav class="flex items-center gap-4 bg-[#1a1a1a] px-5 py-2.5 rounded-full border border-white/5">
+        <nav class="flex items-center gap-4 bg-white/5 px-6 py-2.5 rounded-full border border-white/10">
             <a href="dashboard.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Música</a>
             <a href="social.html" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Social</a>
             <a href="profile.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Historial</a>
         </nav>
 
         <div class="relative">
-            <button id="profile-btn" class="flex items-center gap-3 bg-[#1a1a1a] p-1 pr-4 rounded-full border border-white/5">
+            <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10">
                 <img id="user-avatar" src="" class="w-8 h-8 rounded-full bg-neutral-800 object-cover">
                 <span id="user-name" class="text-xs font-bold truncate max-w-[80px]">...</span>
             </button>
-            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
-                <button id="logout-btn" class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl transition-colors">Cerrar Sesión</button>
+            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
+                <button id="logout-btn" class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl">Cerrar Sesión</button>
             </div>
         </div>
     </header>
 
-    <main class="w-full max-w-6xl">
-        <div class="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
-            <div>
-                <h2 class="text-3xl font-black italic tracking-tighter text-gradient uppercase">Estadísticas</h2>
-                <p class="text-neutral-500 text-[9px] font-black uppercase tracking-[0.3em] mt-1">Comparativa de escucha</p>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="flex gap-1 bg-[#1a1a1a] p-1 rounded-full border border-white/5">
-                    <button id="filter-today" class="px-5 py-2 text-[9px] font-black uppercase rounded-full bg-spotify-green text-black">Hoy</button>
-                    <button id="filter-week" class="px-5 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Semana</button>
-                    <button id="filter-month" class="px-5 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Mes</button>
-                </div>
-                <button id="add-friend-btn" class="px-6 py-3 bg-[#1a1a1a] text-white border border-white/10 font-black text-xs rounded-full hover:bg-white/5 transition-all">Amigos</button>
+    <main class="w-full max-w-5xl flex flex-col items-center gap-10 relative z-10">
+        <!-- FILTROS CENTRADOS -->
+        <div class="flex flex-col items-center gap-6">
+            <div class="flex gap-1 bg-white/5 p-1 rounded-full border border-white/10">
+                <button id="filter-today" class="px-6 py-2 text-[9px] font-black uppercase rounded-full bg-[#1DB954] text-black">Hoy</button>
+                <button id="filter-week" class="px-6 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Semanal</button>
+                <button id="filter-month" class="px-6 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Mensual</button>
             </div>
         </div>
         
-        <div class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-8 items-start">
-            <div id="arena-main-container" class="w-full">
-                <!-- Se inyectará por JS -->
+        <!-- CONTENEDOR PRINCIPAL CENTRADO -->
+        <div id="arena-main-container" class="w-full max-w-2xl">
+            <!-- La card de comparativa se inyectará aquí -->
+        </div>
+
+        <!-- INFO SECUNDARIA EN GRID CENTRADO -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+            <!-- Racha Card -->
+            <div id="streak-card" class="glass p-8 rounded-[2.5rem] flex flex-col items-center text-center hidden">
+                <div class="text-5xl mb-4 streak-fire">🔥</div>
+                <h3 class="text-[9px] font-black uppercase text-orange-500 mb-1 tracking-widest">Racha Actual</h3>
+                <p class="text-3xl font-black italic tracking-tighter"><span id="streak-days">0</span> DÍAS</p>
             </div>
 
-            <div class="flex flex-col gap-6">
-                <!-- MODO RACHA -->
-                <div id="streak-card" class="bg-card p-10 rounded-[3rem] border border-orange-500/10 flex flex-col items-center text-center group relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent"></div>
-                    <div class="text-6xl mb-6 streak-fire relative z-10">🔥</div>
-                    <h3 class="text-[10px] font-black uppercase text-orange-500 mb-2 tracking-widest relative z-10">Racha Actual</h3>
-                    <p class="text-4xl font-black italic mb-2 relative z-10 tracking-tighter"><span id="streak-days">0</span> DÍAS</p>
-                    <p class="text-[11px] text-neutral-500 font-medium max-w-[200px] relative z-10">¡Dominando la Arena!</p>
-                </div>
-
-                <!-- MATCH MUSICAL -->
-                <div id="match-card" class="bg-card p-10 rounded-[3rem] border border-[#1DB954]/10 flex flex-col items-center text-center hidden relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent"></div>
-                    <div class="text-5xl mb-6 relative z-10">🎵</div>
-                    <h3 class="text-[10px] font-black uppercase text-[#1DB954] mb-2 tracking-widest relative z-10">En Sintonía</h3>
-                    <p class="text-2xl font-black italic relative z-10 tracking-tighter"><span id="match-count">0</span> CANCIONES</p>
-                </div>
+            <!-- Match Card -->
+            <div id="match-card" class="glass p-8 rounded-[2.5rem] flex flex-col items-center text-center hidden">
+                <div class="text-4xl mb-4">🎵</div>
+                <h3 class="text-[9px] font-black uppercase text-[#1DB954] mb-1 tracking-widest">En Sintonía</h3>
+                <p class="text-2xl font-black italic tracking-tighter"><span id="match-count">0</span> COMUNES</p>
             </div>
         </div>
+
+        <button id="add-friend-btn" class="px-10 py-4 bg-white/5 hover:bg-white/10 text-white font-black text-xs uppercase tracking-widest rounded-full border border-white/10 transition-all">Administrar Amigos</button>
     </main>
 
     <!-- MODAL DE AMIGOS -->
-    <div id="friend-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[300] hidden flex items-center justify-center p-4">
-        <div class="bg-[#1a1a1a] p-10 rounded-[3.5rem] border border-white/5 w-full max-w-md shadow-2xl">
+    <div id="friend-modal" class="fixed inset-0 bg-black/90 backdrop-blur-2xl z-[300] hidden flex items-center justify-center p-4">
+        <div class="bg-[#0c0c0c] p-10 rounded-[3.5rem] border border-white/5 w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-black italic">Amigos</h2>
-                <button id="close-friend-modal" class="bg-white/5 p-3 rounded-full hover:bg-white/10 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <h2 class="text-2xl font-black italic text-gradient">Amigos</h2>
+                <button id="close-friend-modal" class="bg-white/5 p-3 rounded-full hover:bg-white/10"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="flex gap-4 mb-8 border-b border-white/5 pb-2">
-                <button id="tab-search" class="text-[10px] font-black uppercase tracking-widest text-spotify-green border-b-2 border-spotify-green pb-2">Buscar</button>
+                <button id="tab-search" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954] pb-2">Buscar</button>
                 <button id="tab-requests" class="text-[10px] font-black uppercase tracking-widest text-neutral-500 pb-2">Solicitudes</button>
-                <button id="tab-manage" class="text-[10px] font-black uppercase tracking-widest text-neutral-500 pb-2">Duelos</button>
+                <button id="tab-manage" class="text-[10px] font-black uppercase tracking-widest text-neutral-500 pb-2">Gestionar</button>
             </div>
             <div id="section-search" class="space-y-4">
-                <input type="text" id="friend-search-input" placeholder="Nombre de usuario..." class="w-full bg-black/50 border border-white/10 rounded-2xl py-4 px-6 text-sm focus:border-spotify-green outline-none transition-all">
+                <input type="text" id="friend-search-input" placeholder="Nombre de usuario..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm focus:border-[#1DB954] outline-none">
                 <div id="friend-results" class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2"></div>
             </div>
             <div id="section-requests" class="hidden"><div id="friend-requests" class="space-y-3"></div></div>
@@ -123,16 +118,15 @@
     <script type="module">
         import { supabaseClient } from './js/supabase.js';
         import { initSocial, loadSocialPage } from './js/social.js';
-        
+        import { getValidToken } from './js/token_manager.js';
+
         async function bootstrap() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
                 const user = session.user;
-                // Cargar datos en el header
                 document.getElementById('user-name').textContent = user.user_metadata.display_name || user.email.split('@')[0];
                 document.getElementById('user-avatar').src = user.user_metadata.avatar_url || '';
                 
-                // Dropdown logic
                 const btn = document.getElementById('profile-btn');
                 const menu = document.getElementById('profile-dropdown');
                 btn.onclick = () => menu.classList.toggle('active');
@@ -143,10 +137,32 @@
 
                 initSocial(user);
                 loadSocialPage(user.id);
+                
+                // Fondo dinámico
+                setInterval(() => updateBackground(user.id), 10000);
+                updateBackground(user.id);
             } else {
                 window.location.href = 'index.html';
             }
         }
+
+        async function updateBackground(userId) {
+            const token = await getValidToken(userId);
+            if (!token) return;
+            try {
+                const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 200) {
+                    const data = await res.json();
+                    const imgUrl = data.item.album.images[0].url;
+                    const bg = document.getElementById('album-bg');
+                    bg.style.backgroundImage = `url(${imgUrl})`;
+                    bg.classList.add('visible');
+                }
+            } catch (e) {}
+        }
+
         bootstrap();
     </script>
 </body>

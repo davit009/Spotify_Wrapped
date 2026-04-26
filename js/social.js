@@ -46,14 +46,14 @@ export async function initSocial(currentUser) {
 function formatTime(ms) {
     const hours = Math.floor(ms / 3600000);
     const minutes = Math.floor((ms % 3600000) / 60000);
-    return `${hours}<span class="text-[10px] opacity-20 ml-0.5">H</span> ${minutes}<span class="text-[10px] opacity-20 ml-0.5">M</span>`;
+    return `${hours}<span class="text-[14px] opacity-30 ml-1">h</span> ${minutes}<span class="text-[14px] opacity-30 ml-1">m</span>`;
 }
 
 function getAvatarHTML(url, name, sizeClass = "w-20 h-20", isRobot = false) {
-    if (isRobot) return `<div class="${sizeClass} rounded-full bg-white/5 flex items-center justify-center text-3xl border border-white/10">🤖</div>`;
-    if (url && url.trim() !== '') return `<img src="${url}" class="${sizeClass} rounded-full border border-white/10 object-cover">`;
+    if (isRobot) return `<div class="${sizeClass} rounded-full bg-white/5 flex items-center justify-center text-4xl border border-white/10 shadow-xl">🤖</div>`;
+    if (url && url.trim() !== '') return `<img src="${url}" class="${sizeClass} rounded-full border border-white/20 shadow-2xl object-cover">`;
     const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
-    return `<div class="${sizeClass} rounded-full avatar-fallback text-sm tracking-widest">${initials}</div>`;
+    return `<div class="${sizeClass} rounded-full avatar-fallback text-sm tracking-widest border border-white/10">${initials}</div>`;
 }
 
 function switchTab(tabName, userId) {
@@ -61,11 +61,11 @@ function switchTab(tabName, userId) {
         const btn = document.getElementById(`tab-${t}`);
         const section = document.getElementById(`section-${t}`);
         if (t === tabName) {
-            btn.classList.add('text-spotify-green', 'border-spotify-green', 'border-b-2');
+            btn.classList.add('text-[#1DB954]', 'border-[#1DB954]', 'border-b-2');
             btn.classList.remove('text-neutral-500');
             section.classList.remove('hidden');
         } else {
-            btn.classList.remove('text-spotify-green', 'border-spotify-green', 'border-b-2');
+            btn.classList.remove('text-[#1DB954]', 'border-[#1DB954]', 'border-b-2');
             btn.classList.add('text-neutral-500');
             section.classList.add('hidden');
         }
@@ -78,11 +78,11 @@ function updateFilterUI() {
     ['today', 'week', 'month'].forEach(f => {
         const btn = document.getElementById(`filter-${f}`);
         if (f === currentFilter) {
-            btn.classList.add('bg-spotify-green', 'text-black');
-            btn.classList.remove('text-neutral-500');
+            btn.classList.add('bg-[#1DB954]', 'text-black');
+            btn.classList.remove('text-neutral-400');
         } else {
-            btn.classList.remove('bg-spotify-green', 'text-black');
-            btn.classList.add('text-neutral-500');
+            btn.classList.remove('bg-[#1DB954]', 'text-black');
+            btn.classList.add('text-neutral-400');
         }
     });
 }
@@ -104,7 +104,7 @@ async function renderArena(userId) {
     if (!container) return;
 
     if (activeChallenges.length === 0) {
-        container.innerHTML = `<div class="bg-card p-20 rounded-[3rem] w-full text-center border border-white/5"><p class="text-[10px] font-black uppercase tracking-widest text-neutral-600">Sin datos de comparativa activos</p></div>`;
+        container.innerHTML = `<div class="glass p-20 rounded-[3rem] w-full text-center"><p class="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">Sin comparativas activas</p></div>`;
         return;
     }
 
@@ -130,50 +130,54 @@ async function renderArena(userId) {
     let winHistoryHTML = '';
     if (currentFilter === 'week') {
         const historyLines = await getWinHistoryOptimized(userId, opponentId, ch.start_date);
-        winHistoryHTML = `<div class="w-full max-w-xs flex gap-1.5 h-1 mb-8">${historyLines}</div>`;
+        winHistoryHTML = `<div class="w-full max-w-xs flex gap-2 h-1 mb-10">${historyLines}</div>`;
     }
 
-    const userAvatar = getAvatarHTML(currentUserData?.user_metadata?.avatar_url, "Tú", "w-20 h-20");
-    const friendAvatar = getAvatarHTML(otherUser.avatar_url, otherUser.display_name, "w-20 h-20", otherUser.display_name.toUpperCase().includes('ROBOT'));
+    const userAvatar = getAvatarHTML(currentUserData?.user_metadata?.avatar_url, "Tú", "w-24 h-24");
+    const friendAvatar = getAvatarHTML(otherUser.avatar_url, otherUser.display_name, "w-24 h-24", otherUser.display_name.toUpperCase().includes('ROBOT'));
 
     container.innerHTML = `
-        <div class="bg-card w-full rounded-[4rem] p-10 sm:p-16 border border-white/5 relative overflow-hidden">
-            <div class="flex items-center justify-center gap-12 sm:gap-20 mb-16">
-                <div class="flex flex-col items-center gap-4">
-                    ${userAvatar}
+        <div class="glass w-full rounded-[4rem] p-12 sm:p-20 relative overflow-hidden flex flex-col items-center">
+            <!-- PLAYERS SECTION -->
+            <div class="flex items-center justify-center gap-12 sm:gap-24 mb-16 w-full">
+                <div class="flex flex-col items-center gap-6 flex-1">
+                    <div class="relative">${userAvatar}</div>
                     <div class="text-center">
-                        <p class="text-[9px] font-black uppercase text-spotify-green tracking-widest mb-2">Tú</p>
-                        <p class="text-3xl font-black italic tracking-tighter">${formatTime(myTime)}</p>
+                        <p class="text-[10px] font-black uppercase text-[#1DB954] tracking-[0.3em] mb-2">Tú</p>
+                        <p class="text-4xl font-black italic tracking-tighter text-gradient">${formatTime(myTime)}</p>
                     </div>
                 </div>
-                <div class="text-[10px] font-black text-white/5 uppercase tracking-widest">vs</div>
-                <div class="flex flex-col items-center gap-4">
-                    ${friendAvatar}
+
+                <div class="text-[10px] font-black text-white/5 uppercase tracking-[0.5em] mt-4">vs</div>
+
+                <div class="flex flex-col items-center gap-6 flex-1">
+                    <div class="relative">${friendAvatar}</div>
                     <div class="text-center">
-                        <p class="text-[9px] font-black uppercase text-neutral-500 tracking-widest mb-2">${otherUser.display_name.split(' ')[0]}</p>
-                        <p class="text-3xl font-black italic tracking-tighter">${formatTime(friendTime)}</p>
+                        <p class="text-[10px] font-black uppercase text-neutral-500 tracking-[0.3em] mb-2">${otherUser.display_name.split(' ')[0]}</p>
+                        <p class="text-4xl font-black italic tracking-tighter">${formatTime(friendTime)}</p>
                     </div>
                 </div>
             </div>
 
-            <div class="space-y-4 ${currentFilter === 'week' ? 'mb-4' : 'mb-12'}">
-                <div class="h-2 bg-black/40 rounded-full flex overflow-hidden border border-white/5">
-                    <div class="h-full bg-spotify-green transition-all duration-1000" style="width: ${myPercent}%"></div>
-                    <div class="h-full bg-neutral-800 transition-all duration-1000" style="width: ${friendPercent}%"></div>
+            <!-- PROGRESS BAR -->
+            <div class="w-full max-w-lg mb-12">
+                <div class="h-2 bg-white/5 rounded-full flex overflow-hidden p-0.5">
+                    <div class="h-full bg-[#1DB954] transition-all duration-1000 shadow-[0_0_15px_rgba(29,185,84,0.4)]" style="width: ${myPercent}%"></div>
+                    <div class="h-full bg-white/5 transition-all duration-1000" style="width: ${friendPercent}%"></div>
                 </div>
-                <div class="flex justify-between px-2 text-[8px] font-black text-neutral-600 uppercase tracking-widest">
+                <div class="flex justify-between px-2 mt-4 text-[9px] font-black text-neutral-600 uppercase tracking-widest">
                     <span>${Math.round(myPercent)}%</span>
                     <span>${Math.round(friendPercent)}%</span>
                 </div>
             </div>
 
-            <div class="flex flex-col items-center">
-                ${winHistoryHTML}
-                <div class="py-3 px-8 bg-white/[0.02] rounded-2xl border border-white/5">
-                    <p class="text-center text-[9px] font-black uppercase tracking-[0.4em] text-neutral-400">
-                        ${myTime >= friendTime ? 'Tiempo de escucha superior' : 'Tiempo de escucha inferior'}
-                    </p>
-                </div>
+            <!-- WIN HISTORY & STATUS -->
+            ${winHistoryHTML}
+            
+            <div class="py-4 px-12 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-md">
+                <p class="text-center text-[10px] font-black uppercase tracking-[0.5em] text-neutral-400 italic">
+                    ${myTime >= friendTime ? 'Escucha Superior' : 'Escucha Inferior'}
+                </p>
             </div>
         </div>
     `;
@@ -182,14 +186,14 @@ async function renderArena(userId) {
 async function getWinHistoryOptimized(userId, friendId, challengeStart) {
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); sevenDaysAgo.setHours(0,0,0,0);
     const startDate = new Date(Math.max(sevenDaysAgo, new Date(challengeStart)));
-    const { data: mySessions } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', userId).gte('played_at', startDate.toISOString());
-    const { data: friSessions } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', friendId).gte('played_at', startDate.toISOString());
+    const { data: myS } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', userId).gte('played_at', startDate.toISOString());
+    const { data: friS } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', friendId).gte('played_at', startDate.toISOString());
     let html = '';
     for (let i = 0; i < 7; i++) {
         const d = new Date(); d.setDate(d.getDate() - (6 - i)); d.setHours(0,0,0,0);
         const dayStr = d.toDateString();
-        const myD = (mySessions || []).filter(s => new Date(s.played_at).toDateString() === dayStr).reduce((acc, s) => acc + s.duration_ms, 0);
-        const friD = (friSessions || []).filter(s => new Date(s.played_at).toDateString() === dayStr).reduce((acc, s) => acc + s.duration_ms, 0);
+        const myD = (myS || []).filter(s => new Date(s.played_at).toDateString() === dayStr).reduce((acc, s) => acc + s.duration_ms, 0);
+        const friD = (friS || []).filter(s => new Date(s.played_at).toDateString() === dayStr).reduce((acc, s) => acc + s.duration_ms, 0);
         if (d < new Date(challengeStart)) html += `<div class="win-line bg-transparent border border-white/5"></div>`;
         else if (myD === 0 && friD === 0) html += `<div class="win-line win-none"></div>`;
         else if (myD >= friD) html += `<div class="win-line win-user"></div>`;
@@ -235,11 +239,11 @@ async function getListeningTimeInRange(userId, start, end) {
 async function loadPendingRequests(userId) {
     const container = document.getElementById('friend-requests');
     const { data: requests } = await supabaseClient.from('challenges').select(`*, creator:creator_id (display_name, avatar_url)`).eq('opponent_id', userId).eq('status', 'pending');
-    container.innerHTML = (requests || []).length === 0 ? '<p class="text-center text-neutral-600 text-[10px] py-10 italic uppercase tracking-widest">Sin solicitudes</p>' : '';
+    container.innerHTML = (requests || []).length === 0 ? '<p class="text-center text-neutral-600 text-[9px] py-10 uppercase tracking-[0.3em]">Sin solicitudes</p>' : '';
     requests?.forEach(req => {
         const div = document.createElement('div');
-        div.className = "flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3"><img src="${req.creator.avatar_url || ''}" class="w-8 h-8 rounded-full"><span class="text-xs font-bold text-white">${req.creator.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-5 py-2 rounded-full">Aceptar</button>`;
+        div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
+        div.innerHTML = `<div class="flex items-center gap-3"><img src="${req.creator.avatar_url || ''}" class="w-10 h-10 rounded-full border border-white/10"><span class="text-sm font-bold text-white">${req.creator.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Aceptar</button>`;
         container.appendChild(div);
         div.querySelector('button').addEventListener('click', () => respondChallenge(req.id, 'active', userId));
     });
@@ -252,12 +256,12 @@ async function respondChallenge(challengeId, status, userId) {
 
 async function loadActiveChallengesList(userId) {
     const list = document.getElementById('active-duels-list');
-    list.innerHTML = activeChallenges.length === 0 ? '<p class="text-center text-neutral-600 text-[10px] py-10 italic uppercase tracking-widest">Sin comparativas activas</p>' : '';
+    list.innerHTML = activeChallenges.length === 0 ? '<p class="text-center text-neutral-600 text-[9px] py-10 uppercase tracking-[0.3em]">Sin comparativas activas</p>' : '';
     activeChallenges.forEach(ch => {
         const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
         const div = document.createElement('div');
-        div.className = "flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3"><img src="${otherUser.avatar_url || ''}" class="w-10 h-10 rounded-full border border-white/10"><div><p class="text-sm font-bold text-white">${otherUser.display_name}</p><p class="text-[8px] text-neutral-500 uppercase tracking-widest font-black">Activo</p></div></div><button class="text-[9px] font-black text-neutral-600 hover:text-red-500 uppercase">Remover</button>`;
+        div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
+        div.innerHTML = `<div class="flex items-center gap-3"><img src="${otherUser.avatar_url || ''}" class="w-12 h-12 rounded-full border border-white/10"><div><p class="text-sm font-bold text-white">${otherUser.display_name}</p><p class="text-[8px] text-neutral-500 uppercase tracking-widest font-black">Activo</p></div></div><button class="text-[9px] font-black text-neutral-600 hover:text-red-500 uppercase">Remover</button>`;
         list.appendChild(div);
         div.querySelector('button').addEventListener('click', () => { if(confirm(`¿Remover comparativa con ${otherUser.display_name}?`)) respondChallenge(ch.id, 'finished', userId); });
     });
@@ -268,8 +272,8 @@ function renderSearchResults(users, currentUserId) {
     container.innerHTML = '';
     users.forEach(u => {
         const div = document.createElement('div');
-        div.className = "flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3"><img src="${u.avatar_url || ''}" class="w-10 h-10 rounded-full border border-white/10"><span class="text-sm font-bold text-white">${u.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-5 py-2 rounded-full">Invitar</button>`;
+        div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
+        div.innerHTML = `<div class="flex items-center gap-3"><img src="${u.avatar_url || ''}" class="w-12 h-12 rounded-full border border-white/10"><span class="text-sm font-bold text-white">${u.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Invitar</button>`;
         container.appendChild(div);
         div.querySelector('button').addEventListener('click', async () => {
             const start = new Date(); const end = new Date(); end.setFullYear(end.getFullYear() + 1);
