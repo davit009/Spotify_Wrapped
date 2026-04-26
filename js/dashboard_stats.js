@@ -198,8 +198,14 @@ function renderRecentList(sessions, containerId = 'recent-tracks-list') {
         if (!t) return;
         const timeAgo = getTimeAgo(new Date(sessionItem.played_at));
         container.innerHTML += `
-            <div class="flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-colors border-b border-neutral-800/50 last:border-0">
-                <img src="${t.album.images[0]?.url}" class="w-10 h-10 rounded-md object-cover">
+            <div onclick="event.stopPropagation(); playSpecificTrack('${t.id}')" 
+                 class="flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-colors border-b border-neutral-800/50 last:border-0 cursor-pointer group/item">
+                <div class="relative shrink-0">
+                    <img src="${t.album.images[0]?.url}" class="w-10 h-10 rounded-md object-cover">
+                    <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity rounded-md">
+                        <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                </div>
                 <div class="flex-1 overflow-hidden">
                     <p class="text-sm font-bold text-white truncate">${t.name}</p>
                     <p class="text-xs text-neutral-400 truncate">${t.artists[0].name}</p>
@@ -215,8 +221,14 @@ function renderTopCard(elementId, trackObj, ms) {
     if (!container) return;
     const mins = Math.floor(ms / 60000);
     container.innerHTML = `
-        <div class="flex items-center gap-4 mt-2 w-full">
-            <img src="${trackObj.album.images[0]?.url}" class="w-14 h-14 rounded-md shadow-lg object-cover">
+        <div onclick="event.stopPropagation(); playSpecificTrack('${trackObj.id}')" 
+             class="flex items-center gap-4 mt-2 w-full cursor-pointer group/top">
+            <div class="relative shrink-0">
+                <img src="${trackObj.album.images[0]?.url}" class="w-14 h-14 rounded-md shadow-lg object-cover">
+                <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/top:opacity-100 transition-opacity rounded-md">
+                    <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+            </div>
             <div class="flex-1 overflow-hidden">
                 <p class="text-base font-bold text-white truncate">${trackObj.name}</p>
                 <p class="text-sm text-neutral-400 truncate">${trackObj.artists[0].name}</p>

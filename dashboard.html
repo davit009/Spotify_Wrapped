@@ -61,10 +61,21 @@
                 <div id="embed-container" class="rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-white/5 bg-[#282828]">
                     <!-- El iframe se inyecta dinámicamente aquí -->
                 </div>
+                
+                <!-- Barra de Progreso Sincronizada -->
+                <div class="mt-4 px-1">
+                    <div class="flex justify-between text-[10px] text-neutral-500 mb-1.5 font-mono tracking-tighter">
+                        <span id="np-current-time">0:00</span>
+                        <span id="np-duration">0:00</span>
+                    </div>
+                    <div class="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                        <div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(29,185,84,0.4)]"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Recomendación Especial (La playlist que me pasaste) -->
-            <div class="mt-2 bg-[#181818] p-4 rounded-2xl border border-white/5">
+            <!-- Recomendación Especial (Solo se muestra cuando NO hay música) -->
+            <div id="recommendation-card" class="mt-2 bg-[#181818] p-4 rounded-2xl border border-white/5 transition-all duration-500">
                 <p class="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3">Para descubrir</p>
                 <iframe
                     title="Spotify Embed: Recommendation Playlist"

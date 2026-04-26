@@ -172,12 +172,23 @@ function stopLocalProgress() {
 function showNowPlaying(track, isPlaying = true, progressMs = 0) {
     const card = document.getElementById('now-playing-card');
     const container = document.getElementById('embed-container');
+    const recCard = document.getElementById('recommendation-card');
     if (!card || !container) return;
+
+    // Ocultar recomendaciones si hay música en vivo
+    if (recCard) recCard.classList.add('hidden');
 
     const trackId = track.id;
     const embedUrl = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
     
-    // Solo actualizar el Iframe si la canción CAMBIÓ (para evitar parpadeos)
+    // Sincronizar tiempos y barra
+    lastKnownProgress = progressMs;
+    lastKnownDuration = track.duration_ms;
+    updateProgressUI(lastKnownProgress, lastKnownDuration);
+
+    if (isPlaying) startLocalProgress();
+    else stopLocalProgress();
+
     const currentIframe = container.querySelector('iframe');
     if (!currentIframe || currentIframe.dataset.trackId !== trackId) {
         container.innerHTML = `
@@ -194,7 +205,6 @@ function showNowPlaying(track, isPlaying = true, progressMs = 0) {
         `;
     }
 
-    // Fondo dinámico
     if (track.album.images.length > 0) {
         const albumUrl = track.album.images[0].url;
         const bg = document.getElementById('album-bg');
@@ -211,11 +221,46 @@ function showNowPlaying(track, isPlaying = true, progressMs = 0) {
 
 function hideNowPlaying() {
     const card = document.getElementById('now-playing-card');
+    const recCard = document.getElementById('recommendation-card');
     if (card) card.classList.add('hidden');
+    if (recCard) recCard.classList.remove('hidden'); // Mostrar recomendaciones si no hay música
+    
     const bg = document.getElementById('album-bg');
     if (bg) bg.classList.remove('visible');
     currentTrackInfo = null;
     stopLocalProgress();
+}
+
+/**
+ * Función global para reproducir una canción específica desde cualquier parte de la app.
+ * @param {string} trackId - El ID de Spotify de la canción.
+ */
+async function playSpecificTrack(trackId) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const token = typeof TokenManager !== 'undefined' ? await TokenManager.getToken(session) : session.provider_token;
+    if (!token) return;
+
+    try {
+        const res = await fetch('https://api.spotify.com/v1/me/player/play', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                uris: [`spotify:track:${trackId}`]
+            })
+        });
+
+        if (res.ok) {
+            // Forzar un refresh del tracking para que el player se actualice de inmediato
+            setTimeout(checkCurrentlyPlaying, 500);
+        } else {
+            console.error('Error al intentar reproducir:', await res.text());
+            alert('Abre Spotify en algún dispositivo para poder reproducir desde aquí.');
+        }
+    } catch (e) {
+        console.error('Error en playSpecificTrack:', e);
+    }
 }
 
 async function syncOfflineHistory(session) {
