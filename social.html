@@ -9,104 +9,141 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; }
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; overflow-x: hidden; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        .tab-btn.active { color: #1DB954; border-bottom: 2px solid #1DB954; }
+        
+        /* Dropdown */
+        .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
+        .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+        
+        /* Arena Carousel */
+        .arena-container { scroll-snap-type: x mandatory; display: flex; overflow-x: auto; gap: 2rem; scroll-behavior: smooth; }
+        .arena-card { min-width: 100%; scroll-snap-align: center; }
+        
+        .progress-bar-bg { background: rgba(255,255,255,0.05); height: 12px; border-radius: 99px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
     
-    <header class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center mb-10 gap-6">
+    <!-- HEADER UNIFICADO -->
+    <header class="max-w-7xl mx-auto flex justify-between items-center mb-10 relative z-[100]">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
                 <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.5 14.75c-.15.25-.45.35-.7.2-2.35-1.45-5.3-1.75-8.8-.95-.3.05-.6-.15-.65-.45s.15-.6.45-.65c3.85-.85 7.1-.5 9.7 1.1.25.15.35.45.2.75zm1.25-2.75c-.2.3-.6.4-.9.2-2.7-1.65-6.8-2.15-9.95-1.15-.35.1-.7-.1-.8-.45s.1-.7.45-.8c3.65-1.1 8.15-.55 11.25 1.35.3.15.4.55.2.85zm.1-2.8c-3.25-1.95-8.65-2.15-11.75-1.2-.5.15-1-.15-1.15-.65-.15-.5.15-1 .65-1.15 3.55-1.1 9.5-.85 13.25 1.4.45.25.6.85.35 1.3-.25.45-.85.6-1.35.3z"/></svg>
             </div>
             <h1 class="text-2xl font-black tracking-tighter">SpotiStats</h1>
         </div>
-        <nav class="flex items-center gap-6 bg-white/5 px-6 py-3 rounded-full border border-white/10">
+
+        <nav class="flex items-center gap-6 bg-white/5 px-6 py-3 rounded-full border border-white/10 hidden md:flex">
             <a href="dashboard.html" class="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Música</a>
             <a href="social.html" class="text-xs font-black uppercase tracking-widest text-[#1DB954]">Social</a>
             <a href="profile.html" class="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Historial</a>
         </nav>
-        <div class="flex items-center gap-4">
-            <button id="invite-btn" class="bg-[#1DB954] text-black text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full hover:scale-105 transition-transform">Invitar Amigo</button>
-            <div class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10">
-                <img id="user-avatar" src="" class="w-8 h-8 rounded-full border border-white/10 hidden" alt="Avatar">
-                <span id="user-name" class="text-sm font-bold">...</span>
+
+        <div class="relative">
+            <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10 hover:bg-white/10 transition-all">
+                <img id="user-avatar" src="" class="w-9 h-9 rounded-full border border-white/10 bg-neutral-800" alt="Avatar">
+                <span id="user-name" class="text-sm font-bold truncate max-w-[100px]">...</span>
+                <div id="request-dot" class="w-2 h-2 bg-[#1DB954] rounded-full absolute -top-1 -right-1 hidden"></div>
+            </button>
+
+            <!-- DROPDOWN SOCIAL Y AJUSTES -->
+            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-3 w-72 bg-[#121212] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden p-2 z-[110]">
+                <div class="p-5 border-b border-white/5">
+                    <p class="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-4">Gestión Social</p>
+                    <button id="open-friends-modal" class="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all group">
+                        <span class="text-sm font-black italic">Buscar y Solicitudes</span>
+                        <div id="request-badge-count" class="bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full hidden">0</div>
+                    </button>
+                </div>
+                <div class="p-2 space-y-1">
+                    <button id="invite-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-xl transition-colors">
+                        <svg class="w-4 h-4 text-[#1DB954]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 100 5.368m0-5.368l6.632-3.316m-6.632 6l6.632 3.316m0 0a3 3 0 100-5.368m0 5.368l6.632 3.316"></path></svg>
+                        <span class="text-sm font-bold">Copiar Invitación</span>
+                    </button>
+                    <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 rounded-xl transition-colors text-red-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <span class="text-sm font-bold">Cerrar Sesión</span>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-8">
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
         
-        <div class="flex flex-col gap-6">
-            <!-- Marcadores Rápidos -->
-            <div class="grid grid-cols-1 gap-4">
-                <div class="glass p-6 rounded-[2rem] relative overflow-hidden">
-                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Líder del Día</h3>
-                    <div id="social-today-content" class="flex items-center gap-4"><p class="text-xs text-neutral-600 italic">Cargando...</p></div>
+        <!-- COLUMNA CENTRAL: LA ARENA -->
+        <div class="flex flex-col gap-8">
+            <div class="flex justify-between items-end px-4">
+                <div>
+                    <h2 class="text-4xl font-black italic">Arena Dúo</h2>
+                    <p class="text-[10px] text-neutral-500 uppercase font-black tracking-widest mt-1">Tu progreso contra tus amigos</p>
                 </div>
-                <div class="glass p-6 rounded-[2rem] relative overflow-hidden">
-                    <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Líder de la Semana</h3>
-                    <div id="social-week-content" class="flex items-center gap-4"><p class="text-xs text-neutral-600 italic">Cargando...</p></div>
-                </div>
-            </div>
-
-            <!-- TARJETA AMIGOS (CON PESTAÑAS INTERNAS) -->
-            <div class="glass p-8 rounded-[2.5rem]">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-black italic">Amigos</h3>
-                    <div class="flex gap-4">
-                        <button id="tab-btn-search" class="tab-btn active text-[10px] font-black uppercase tracking-widest pb-1 transition-all">Buscar</button>
-                        <button id="tab-btn-requests" class="tab-btn text-neutral-500 text-[10px] font-black uppercase tracking-widest pb-1 transition-all relative">
-                            Solicitudes
-                            <span id="request-badge" class="absolute -top-1 -right-2 w-2 h-2 bg-[#1DB954] rounded-full hidden"></span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Contenedor Buscar -->
-                <div id="container-search" class="space-y-6">
-                    <div class="relative">
-                        <input type="text" id="user-search-input" placeholder="Nombre..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-12 text-sm focus:outline-none focus:border-[#1DB954]">
-                        <svg class="w-5 h-5 text-neutral-600 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    </div>
-                    <div id="user-search-results" class="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar"></div>
-                </div>
-
-                <!-- Contenedor Solicitudes -->
-                <div id="container-requests" class="hidden space-y-4 max-h-[350px] overflow-y-auto custom-scrollbar">
-                    <p class="text-center text-neutral-600 text-xs py-10">No tienes solicitudes pendientes.</p>
+                <div class="flex gap-2">
+                    <button id="prev-duel" class="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg></button>
+                    <button id="next-duel" class="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg></button>
                 </div>
             </div>
 
-            <!-- Mis Retos Activos -->
-            <div class="glass p-8 rounded-[2.5rem]">
-                <h3 class="text-xl font-black mb-6 italic">Dúos Activos</h3>
-                <div id="social-tab-active" class="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2"></div>
+            <!-- Carrusel de Arena -->
+            <div id="arena-carousel" class="arena-container custom-scrollbar pb-4">
+                <!-- Se llenará con JS -->
+                <div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-neutral-600 italic">
+                    Cargando tus duelos...
+                </div>
             </div>
         </div>
 
-        <!-- Columna Derecha: Historial en Común -->
+        <!-- COLUMNA DERECHA: SOCIAL COMPACTO -->
         <div class="flex flex-col gap-6">
-            <div class="glass p-8 rounded-[2.5rem] flex-1 flex flex-col min-h-[600px]">
-                <div class="flex justify-between items-center mb-8">
-                    <div>
-                        <h2 class="text-3xl font-black italic">Historial en Común</h2>
-                        <p class="text-[10px] text-neutral-500 uppercase font-black tracking-widest mt-1">Canciones que ambos escucharon hoy</p>
-                    </div>
-                </div>
-                <div id="common-tracks-list" class="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-                    <div class="flex flex-col items-center justify-center h-full text-neutral-600 italic text-center">
-                        <p>No hay coincidencias hoy todavía.</p>
-                    </div>
+            
+            <!-- Marcadores Rápidos (Líderes) -->
+            <div id="leader-cards" class="grid grid-cols-1 gap-4">
+                <!-- Dinámico -->
+            </div>
+
+            <!-- Historial en Común (Más pequeño) -->
+            <div class="glass p-6 rounded-[2.5rem] flex flex-col">
+                <h3 class="text-xs font-black uppercase text-neutral-500 mb-6 tracking-widest flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"></path></svg>
+                    Match Musical
+                </h3>
+                <div id="common-tracks-list" class="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                    <p class="text-[10px] text-neutral-600 italic">Sin coincidencias hoy.</p>
                 </div>
             </div>
         </div>
     </main>
+
+    <!-- MODAL DE AMIGOS (Desde el perfil) -->
+    <div id="friends-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[200] hidden flex items-center justify-center p-4">
+        <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black italic">Amigos</h2>
+                <button id="close-friends-modal" class="bg-white/5 p-3 rounded-full hover:bg-white/10 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="flex gap-6 mb-8 border-b border-white/5">
+                <button id="tab-btn-search" class="pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]">Buscar</button>
+                <button id="tab-btn-requests" class="pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">Solicitudes</button>
+            </div>
+
+            <div id="container-search" class="space-y-4 flex-1 overflow-hidden flex flex-col">
+                <input type="text" id="user-search-input" placeholder="Nombre..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm focus:border-[#1DB954] outline-none">
+                <div id="user-search-results" class="flex-1 overflow-y-auto custom-scrollbar space-y-2"></div>
+            </div>
+
+            <div id="container-requests" class="hidden flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                <p class="text-center text-neutral-600 text-xs py-10 italic">No hay solicitudes.</p>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
@@ -116,11 +153,8 @@
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (session) {
                 document.getElementById('user-name').textContent = session.user.user_metadata.full_name || 'Usuario';
-                if (session.user.user_metadata.avatar_url) {
-                    const img = document.getElementById('user-avatar');
-                    img.src = session.user.user_metadata.avatar_url;
-                    img.classList.remove('hidden');
-                }
+                if (session.user.user_metadata.avatar_url) document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
+                
                 initSocial(session.user);
                 loadSocialPage(session.user.id);
             } else {
@@ -128,31 +162,38 @@
             }
         });
 
-        // Lógica de Pestañas Internas (Buscar / Solicitudes)
+        // UI Logic
+        const dropdown = document.getElementById('profile-dropdown');
+        document.getElementById('profile-btn').addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('active'); });
+        document.addEventListener('click', () => dropdown.classList.remove('active'));
+
+        const friendsModal = document.getElementById('friends-modal');
+        document.getElementById('open-friends-modal').addEventListener('click', () => { friendsModal.classList.remove('hidden'); dropdown.classList.remove('active'); });
+        document.getElementById('close-friends-modal').addEventListener('click', () => friendsModal.classList.add('hidden'));
+
+        // Tabs Modal
         const btnSearch = document.getElementById('tab-btn-search');
         const btnReq = document.getElementById('tab-btn-requests');
         const contSearch = document.getElementById('container-search');
         const contReq = document.getElementById('container-requests');
 
         btnSearch.addEventListener('click', () => {
-            btnSearch.classList.add('active');
-            btnReq.classList.remove('active');
-            contSearch.classList.remove('hidden');
-            contReq.classList.add('hidden');
+            btnSearch.className = "pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]";
+            btnReq.className = "pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors";
+            contSearch.classList.remove('hidden'); contReq.classList.add('hidden');
         });
 
         btnReq.addEventListener('click', () => {
-            btnReq.classList.add('active');
-            btnSearch.classList.remove('active');
-            contReq.classList.remove('hidden');
-            contSearch.classList.add('hidden');
-            // Al entrar a solicitudes, podríamos quitar el badge si lo deseamos
-            document.getElementById('request-badge').classList.add('hidden');
+            btnReq.className = "pb-4 text-xs font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954]";
+            btnSearch.className = "pb-4 text-xs font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors";
+            contReq.classList.remove('hidden'); contSearch.classList.add('hidden');
         });
 
         document.getElementById('invite-btn').addEventListener('click', () => {
             navigator.clipboard.writeText(window.location.origin).then(() => alert("¡Enlace copiado!"));
         });
+
+        document.getElementById('logout-btn').addEventListener('click', () => supabaseClient.auth.signOut());
     </script>
 </body>
 </html>
