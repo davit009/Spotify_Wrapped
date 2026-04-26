@@ -43,7 +43,7 @@ async function loadTotalTime(userId) {
     const minutes = Math.floor((totalMs % 3600000) / 60000);
     
     const el = document.getElementById('stats-total-hours');
-    if (el) el.innerHTML = `${hours}<span class="text-xl sm:text-2xl opacity-40 ml-1">h</span> ${minutes}<span class="text-xl sm:text-2xl opacity-40 ml-1">m</span>`;
+    if (el) el.innerHTML = `${hours}<span class="text-xl text-white/50 ml-1 not-italic">h</span> ${minutes}<span class="text-xl text-white/50 ml-1 not-italic">m</span>`;
 }
 
 async function loadTops(userId, session) {
