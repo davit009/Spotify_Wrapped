@@ -1,3 +1,9 @@
+let globalStats = {
+    today: [],
+    week: [],
+    recent: [],
+    spotifyCache: {}
+};
 let _session = null; // módulo-level para que fetchTracksFromSpotify pueda refrescar
 
 async function loadDynamicStats(session) {
