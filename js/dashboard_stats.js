@@ -29,13 +29,13 @@ export async function initDashboard(session) {
 }
 
 async function loadStats(userId) {
-    // 1. Obtener Historial Reciente de Supabase
+    // 1. Obtener Historial Amplio de Supabase (últimas 1000 sesiones para cálculos precisos)
     const { data: recentSessions, error } = await supabaseClient
         .from('listening_sessions')
         .select('*')
         .eq('user_id', userId)
         .order('played_at', { ascending: false })
-        .limit(20);
+        .limit(1000); 
 
     if (error) return;
 
@@ -46,6 +46,7 @@ async function loadStats(userId) {
     const todaySessions = recentSessions.filter(s => new Date(s.played_at) >= startOfToday);
     
     globalStats.today = getTopTracks(todaySessions, 5);
+    
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekSessions = recentSessions.filter(s => new Date(s.played_at) >= weekAgo);
@@ -199,14 +200,81 @@ function renderTopCard(id, track, ms) {
 
 function setupModals() {
     const listModal = document.getElementById('list-modal');
-    if (!listModal) return;
+    const modalContent = document.getElementById('list-modal-content');
     
+    // Clic Historial Reciente (Ya lo tenías, lo mantenemos)
     document.getElementById('recent-history-card')?.addEventListener('click', () => {
-        const body = document.getElementById('list-modal-body');
         document.getElementById('list-modal-title').textContent = "Historial Completo";
         renderRecentList(globalStats.recent, 'list-modal-body');
         listModal.classList.remove('hidden');
     });
 
+    // --- RESTAURADO: Clic Top Hoy ---
+    document.getElementById('card-top-today')?.addEventListener('click', () => {
+        document.getElementById('list-modal-title').textContent = "Obsesión de Hoy";
+        renderTopListInModal(globalStats.today, 'Hoy');
+        listModal.classList.remove('hidden');
+    });
+
+    // --- RESTAURADO: Clic Top Semana ---
+    document.getElementById('card-top-week')?.addEventListener('click', () => {
+        document.getElementById('list-modal-title').textContent = "Rey de la Semana";
+        renderTopListInModal(globalStats.week, 'Semana');
+        listModal.classList.remove('hidden');
+    });
+
     document.getElementById('close-list-modal')?.addEventListener('click', () => listModal.classList.add('hidden'));
+}
+
+function renderTopListInModal(topArray, typeName) {
+    const modalBody = document.getElementById('list-modal-body');
+    if (!modalBody) return;
+    modalBody.innerHTML = '';
+
+    if (topArray.length === 0) {
+        modalBody.innerHTML = '<p class="text-neutral-500 text-center py-10">No hay datos suficientes aún.</p>';
+        return;
+    }
+
+    // Top 1 (El Ganador)
+    const t1 = globalStats.spotifyCache[topArray[0].id];
+    if (t1) {
+        const mins1 = Math.floor(topArray[0].ms / 60000);
+        modalBody.innerHTML += `
+            <div class="bg-gradient-to-br from-[#1DB954]/20 to-black p-8 rounded-[2rem] border border-[#1DB954]/30 text-center mb-8 shadow-2xl">
+                <p class="text-[#1DB954] font-black text-[10px] uppercase tracking-[0.3em] mb-6">👑 TU #1 MÁS ESCUCHADA</p>
+                <img src="${t1.album.images[0]?.url}" class="w-40 h-40 mx-auto rounded-2xl shadow-2xl mb-6 object-cover hover:scale-105 transition-transform duration-500">
+                <h3 class="text-2xl font-black text-white mb-2">${t1.name}</h3>
+                <p class="text-neutral-400 font-bold mb-6">${t1.artists[0].name}</p>
+                <div class="inline-flex items-center gap-3 bg-[#1DB954] text-black px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest">
+                    ${mins1} minutos totales
+                </div>
+            </div>
+        `;
+    }
+
+    // Runners up (Del #2 al #5)
+    if (topArray.length > 1) {
+        modalBody.innerHTML += '<h4 class="font-black text-neutral-500 uppercase tracking-widest text-[10px] mb-4 pl-2">Pisándole los talones:</h4>';
+        
+        topArray.slice(1).forEach((item, index) => {
+            const t = globalStats.spotifyCache[item.id];
+            if (!t) return;
+            const mins = Math.floor(item.ms / 60000);
+
+            modalBody.innerHTML += `
+                <div class="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors mb-3">
+                    <span class="text-neutral-600 font-black w-6 text-center italic text-xl">#${index + 2}</span>
+                    <img src="${t.album.images[0]?.url}" class="w-14 h-14 rounded-xl object-cover shadow-lg">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-white truncate">${t.name}</p>
+                        <p class="text-[10px] text-neutral-500 font-bold truncate uppercase tracking-tighter">${t.artists[0].name}</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-xs font-black text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full">${mins}m</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
 }
