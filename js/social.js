@@ -40,7 +40,7 @@ async function renderArenaCarousel(userId) {
     if (!container) return;
 
     if (activeChallenges.length === 0) {
-        container.innerHTML = `<div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-center italic text-neutral-500">Sin duelos activos.</div>`;
+        container.innerHTML = `<div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-center italic text-neutral-500">Busca amigos en tu perfil para empezar un duelo.</div>`;
         return;
     }
 
@@ -61,11 +61,11 @@ async function renderArenaCarousel(userId) {
         const myMins = Math.floor(myTime / 60000);
         const friendMins = Math.floor(friendTime / 60000);
         
-        // Lógica de porcentaje: 
-        // El que tenga más tiempo hoy define el 100% de la visualización (mínimo 1 min para que no salga vacía)
-        const maxMins = Math.max(myMins, friendMins, 1);
-        const myPercent = (myMins / maxMins) * 100;
-        const friendPercent = (friendMins / maxMins) * 100;
+        // Lógica de BARRA ÚNICA (Tira y afloja)
+        const total = myTime + friendTime;
+        // Si nadie ha escuchado nada, 50/50
+        const myPercent = total === 0 ? 50 : (myTime / total) * 100;
+        const friendPercent = 100 - myPercent;
 
         const card = document.createElement('div');
         card.className = "arena-card glass rounded-[3rem] p-8 sm:p-12 flex flex-col gap-10 relative overflow-hidden";
@@ -73,68 +73,54 @@ async function renderArenaCarousel(userId) {
             <div class="flex justify-between items-center relative z-10">
                 <div class="flex flex-col items-center gap-4 flex-1">
                     <div class="relative">
-                        <img src="${document.getElementById('user-avatar')?.src || ''}" class="w-20 h-20 rounded-full border-4 border-white/5 shadow-2xl">
-                        ${myMins >= friendMins && myMins > 0 ? '<div class="absolute -top-2 -right-2 bg-[#1DB954] text-black text-[8px] font-black px-2 py-1 rounded-full animate-bounce shadow-lg">LÍDER</div>' : ''}
+                        <img src="${document.getElementById('user-avatar')?.src || ''}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-white/5 shadow-2xl">
+                        ${myMins >= friendMins && myMins > 0 ? '<div class="absolute -top-2 -right-2 bg-[#1DB954] text-black text-[8px] font-black px-2 py-1 rounded-full animate-bounce">GANANDO</div>' : ''}
                     </div>
                     <div class="text-center">
-                        <p class="text-xs font-black uppercase tracking-widest text-[#1DB954]">Tú</p>
-                        <p class="text-4xl font-black italic">${myMins}<span class="text-xs font-normal opacity-50 ml-1">min</span></p>
+                        <p class="text-[10px] font-black uppercase text-[#1DB954]">Tú</p>
+                        <p class="text-3xl sm:text-4xl font-black italic">${myMins}<span class="text-xs font-normal opacity-40 ml-0.5">m</span></p>
                     </div>
                 </div>
 
-                <div class="flex flex-col items-center px-4"><div class="text-xs font-black opacity-10">VS</div></div>
+                <div class="flex flex-col items-center px-4"><div class="text-[10px] font-black opacity-10">VS</div></div>
 
                 <div class="flex flex-col items-center gap-4 flex-1">
                     <div class="relative">
-                        <img src="${otherUser.avatar_url || ''}" class="w-20 h-20 rounded-full border-4 border-white/5 shadow-2xl">
-                        ${friendMins > myMins ? '<div class="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-full animate-bounce shadow-lg">LÍDER</div>' : ''}
+                        <img src="${otherUser.avatar_url || ''}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-white/5 shadow-2xl">
+                        ${friendMins > myMins ? '<div class="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-full animate-bounce">LÍDER</div>' : ''}
                     </div>
                     <div class="text-center">
-                        <p class="text-xs font-black uppercase tracking-widest text-red-500">${otherUser.display_name}</p>
-                        <p class="text-4xl font-black italic">${friendMins}<span class="text-xs font-normal opacity-50 ml-1">min</span></p>
+                        <p class="text-[10px] font-black uppercase text-red-500">${otherUser.display_name.split(' ')[0]}</p>
+                        <p class="text-3xl sm:text-4xl font-black italic">${friendMins}<span class="text-xs font-normal opacity-40 ml-0.5">m</span></p>
                     </div>
                 </div>
             </div>
 
-            <div class="space-y-6 relative z-10">
-                <!-- Tu Barra (Siempre Verde) -->
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center px-1">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-neutral-500">Tu Energía</span>
-                        <span class="text-[10px] font-bold text-[#1DB954]">${myMins} min</span>
+            <div class="px-2 relative z-10">
+                <div class="progress-bar-bg flex bg-white/5 border-none h-5 overflow-hidden rounded-full shadow-inner">
+                    <!-- Tu lado (Verde) -->
+                    <div class="h-full bg-[#1DB954] transition-all duration-1000 ease-out relative" style="width: ${myPercent}%">
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent to-white/20"></div>
                     </div>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill winning-pulse bg-[#1DB954]" style="width: ${myPercent}%"></div>
-                    </div>
+                    <!-- Su lado (Rojo) -->
+                    <div class="h-full bg-red-500/80 transition-all duration-1000 ease-out" style="width: ${friendPercent}%"></div>
                 </div>
-
-                <!-- Su Barra (Siempre Roja) -->
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center px-1">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-neutral-500">Rival</span>
-                        <span class="text-[10px] font-bold text-red-500">${friendMins} min</span>
-                    </div>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill bg-red-500/40" style="width: ${friendPercent}%; border-right: 2px solid #ef4444;"></div>
-                    </div>
+                <div class="flex justify-between mt-3 px-2">
+                    <span class="text-[8px] font-black uppercase tracking-widest text-[#1DB954]">${Math.round(myPercent)}%</span>
+                    <span class="text-[8px] font-black uppercase tracking-widest text-red-500">${Math.round(friendPercent)}%</span>
                 </div>
-
-                <p class="text-center text-[10px] font-black uppercase tracking-[0.3em] mt-4 ${myMins >= friendMins ? 'text-[#1DB954]' : 'text-red-500'}">
-                    ${myMins >= friendMins ? '¡Dominando la Arena!' : '¡Alcanza a tu rival!'}
-                </p>
             </div>
+
+            <p class="text-center text-[10px] font-black uppercase tracking-[0.3em] ${myMins >= friendMins ? 'text-[#1DB954]' : 'text-red-500'}">
+                ${myMins >= friendMins ? '¡Dominando la Arena!' : '¡A por ellos!'}
+            </p>
 
             <button class="cancel-duel-btn absolute top-6 right-6 text-neutral-800 hover:text-red-500 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         `;
         container.appendChild(card);
         
-        // Timeout para activar la animación de la barra tras el render
-        setTimeout(() => {
-            card.querySelectorAll('.progress-bar-fill').forEach(f => f.style.width = f.style.width);
-        }, 50);
-
         card.querySelector('.cancel-duel-btn').addEventListener('click', () => {
             if(confirm("¿Cancelar este duelo anual?")) respondChallenge(ch.id, 'finished', userId);
         });
@@ -146,7 +132,6 @@ async function renderLeaders(userId) {
     if (!container) return;
     container.innerHTML = '';
     if (activeChallenges.length === 0) return;
-
     const ch = activeChallenges[0];
     const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
     const opponentId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
@@ -154,7 +139,6 @@ async function renderLeaders(userId) {
     const dayFilter = new Date(Math.max(startOfToday, new Date(ch.start_date))).toISOString();
     const [myDay, friendDay] = await Promise.all([getListeningTime(userId, dayFilter), getListeningTime(opponentId, dayFilter)]);
     container.innerHTML += renderLeaderCard('Líder del Día', otherUser, myDay, friendDay);
-
     const challengeAgeDays = (Date.now() - new Date(ch.start_date)) / (1000 * 60 * 60 * 24);
     if (challengeAgeDays >= 7) {
         const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);

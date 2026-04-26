@@ -19,9 +19,7 @@
         .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
         .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
         .text-gradient { background: linear-gradient(to right, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        
-        /* Animación de carga para tarjetas vacías */
-        .loading-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .loading-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
     </style>
 </head>
@@ -29,36 +27,34 @@
     <div id="album-bg"></div>
 
     <header class="w-full max-w-7xl flex flex-col md:flex-row justify-between items-center mb-10 gap-6 relative z-[100]">
-        <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="flex items-center gap-3 w-full md:w-auto justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
                     <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.5 14.75c-.15.25-.45.35-.7.2-2.35-1.45-5.3-1.75-8.8-.95-.3.05-.6-.15-.65-.45s.15-.6.45-.65c3.85-.85 7.1-.5 9.7 1.1.25.15.35.45.2.75zm1.25-2.75c-.2.3-.6.4-.9.2-2.7-1.65-6.8-2.15-9.95-1.15-.35.1-.7-.1-.8-.45s.1-.7.45-.8c3.65-1.1 8.15-.55 11.25 1.35.3.15.4.55.2.85zm.1-2.8c-3.25-1.95-8.65-2.15-11.75-1.2-.5.15-1-.15-1.15-.65-.15-.5.15-1 .65-1.15 3.55-1.1 9.5-.85 13.25 1.4.45.25.6.85.35 1.3-.25.45-.85.6-1.35.3z"/></svg>
                 </div>
                 <h1 class="text-2xl font-black tracking-tighter">SpotiStats</h1>
             </div>
-            <div class="relative md:hidden">
-                <button id="profile-btn-mobile" class="w-10 h-10 rounded-full border border-white/20 overflow-hidden"><img id="user-avatar-mobile" src="" class="w-full h-full object-cover bg-neutral-800"></button>
-            </div>
+            <button id="profile-btn-mobile" class="md:hidden w-10 h-10 rounded-full border border-white/20 overflow-hidden"><img id="user-avatar-mobile" src="" class="w-full h-full object-cover bg-neutral-800"></button>
         </div>
-        <nav class="flex items-center gap-4 sm:gap-6 bg-white/5 px-4 sm:px-6 py-3 rounded-full border border-white/10 w-full md:w-auto justify-center">
-            <a href="dashboard.html" class="text-[10px] sm:text-xs font-black uppercase tracking-widest text-[#1DB954]">Música</a>
-            <a href="social.html" class="text-[10px] sm:text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Social</a>
-            <a href="profile.html" class="text-[10px] sm:text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Historial</a>
+        <nav class="flex items-center gap-4 bg-white/5 px-6 py-3 rounded-full border border-white/10 w-full md:w-auto justify-center">
+            <a href="dashboard.html" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Música</a>
+            <a href="social.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Social</a>
+            <a href="profile.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Historial</a>
         </nav>
         <div class="relative hidden md:block">
-            <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10 hover:bg-white/10 transition-all">
-                <img id="user-avatar" src="" class="w-9 h-9 rounded-full border border-white/10 bg-neutral-800">
+            <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10 hover:bg-white/10">
+                <img id="user-avatar" src="" class="w-9 h-9 rounded-full bg-neutral-800">
                 <span id="user-name" class="text-sm font-bold truncate max-w-[100px]">...</span>
             </button>
             <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-3 w-64 bg-[#121212] border border-white/10 rounded-[2rem] shadow-2xl p-2 z-[110]">
-                <div class="py-2"><button id="logout-btn" class="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 font-bold text-sm rounded-xl">Cerrar Sesión</button></div>
+                <button id="logout-btn" class="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 font-bold text-sm rounded-xl">Cerrar Sesión</button>
             </div>
         </div>
     </header>
 
     <main class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-8">
         <div class="flex flex-col gap-6 order-2 lg:order-1">
-            <div id="now-playing-card" class="relative group overflow-hidden rounded-[2.5rem] glass p-1 transition-all duration-700 hidden shadow-2xl">
+            <div id="now-playing-card" class="relative group overflow-hidden rounded-[2.5rem] glass p-1 transition-all duration-700 hidden">
                 <div class="flex flex-col sm:flex-row gap-6 p-6 relative z-10">
                     <div class="relative shrink-0 w-full sm:w-48 aspect-square rounded-3xl overflow-hidden shadow-2xl"><img id="np-image" src="" class="w-full h-full object-cover"></div>
                     <div class="flex-1 min-w-0 flex flex-col justify-center text-center sm:text-left">
@@ -75,30 +71,37 @@
 
             <div class="glass p-8 rounded-[2.5rem] min-h-[400px]">
                 <h3 class="text-2xl font-black flex items-center gap-3 text-white mb-6">Historial Reciente</h3>
-                <div id="recent-tracks-list" class="space-y-4">
-                    <div class="loading-pulse bg-white/5 h-20 rounded-2xl"></div>
-                    <div class="loading-pulse bg-white/5 h-20 rounded-2xl"></div>
-                </div>
+                <div id="recent-tracks-list" class="space-y-4"></div>
             </div>
         </div>
 
         <div class="flex flex-col gap-6 order-1 lg:order-2">
-            <div class="glass p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-center relative overflow-hidden border-[#1DB954]/20 min-h-[160px]">
-                <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-2 tracking-widest relative z-10">Tiempo Total</h3>
-                <p id="stats-total-hours" class="text-5xl sm:text-6xl font-black italic text-gradient tracking-tighter relative z-10">...h ...m</p>
+            <!-- TIEMPO TOTAL CON MÁS AIRE -->
+            <div class="glass p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-center relative overflow-hidden border-[#1DB954]/20 min-h-[180px]">
+                <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest relative z-10">Tiempo Total</h3>
+                <p id="stats-total-hours" class="text-5xl sm:text-6xl font-black italic text-gradient tracking-tighter relative z-10 px-2">0<span class="text-lg opacity-40 ml-1">h</span> 0<span class="text-lg opacity-40 ml-1">m</span></p>
             </div>
-            <div id="card-top-today" class="glass p-8 rounded-[2.5rem] min-h-[240px] flex flex-col justify-end relative overflow-hidden group">
-                <h3 class="text-[11px] font-black uppercase text-neutral-500 mb-4 tracking-widest absolute top-8 left-8">Obsesión de Hoy</h3>
-            </div>
-            <div id="card-top-week" class="glass p-8 rounded-[2.5rem] min-h-[240px] flex flex-col justify-end relative overflow-hidden group">
-                <h3 class="text-[11px] font-black uppercase text-neutral-500 mb-4 tracking-widest absolute top-8 left-8">Rey de la Semana</h3>
+
+            <!-- CUADRICULA DE TOPS (CUADRADOS) -->
+            <div class="grid grid-cols-2 gap-4">
+                <div id="card-top-today" class="glass rounded-[2rem] aspect-square flex flex-col justify-end p-6 relative overflow-hidden group cursor-pointer hover:border-[#1DB954]/40 transition-all">
+                    <h3 class="text-[9px] font-black uppercase text-neutral-500 mb-2 tracking-widest absolute top-6 left-6">Hoy</h3>
+                </div>
+                <div id="card-top-week" class="glass rounded-[2rem] aspect-square flex flex-col justify-end p-6 relative overflow-hidden group cursor-pointer hover:border-[#1DB954]/40 transition-all">
+                    <h3 class="text-[9px] font-black uppercase text-neutral-500 mb-2 tracking-widest absolute top-6 left-6">Semanal</h3>
+                </div>
             </div>
         </div>
     </main>
 
-    <div id="mobile-profile-menu" class="fixed inset-0 bg-black/95 z-[200] hidden flex flex-col p-8">
-        <div class="flex justify-between items-center mb-10"><h2 class="text-2xl font-black italic">Mi Perfil</h2><button id="close-mobile-menu" class="p-2 bg-white/5 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button></div>
-        <div class="space-y-6"><button id="logout-btn-mobile" class="block w-full text-left text-xl font-bold p-4 bg-red-500/10 text-red-500 rounded-2xl">Cerrar Sesión</button></div>
+    <div id="list-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[200] hidden flex items-center justify-center p-4">
+        <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-start mb-8 shrink-0">
+                <h2 id="list-modal-title" class="text-3xl font-black italic text-[#1DB954]">Top 5</h2>
+                <button id="close-list-modal" class="bg-white/5 p-3 rounded-full hover:bg-white/10"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div id="list-modal-body" class="overflow-y-auto pr-2 space-y-3 flex-1 custom-scrollbar"></div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -109,52 +112,28 @@
 
         async function bootstrap() {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                console.log("Sesión activa detectada:", session.user.email);
-                handleAuth(session);
-            } else {
-                console.log("No hay sesión, esperando evento...");
-                supabaseClient.auth.onAuthStateChange((event, newSession) => {
-                    if (newSession) handleAuth(newSession);
-                    else if (event === 'SIGNED_OUT') window.location.href = 'index.html';
-                });
-            }
+            if (session) handleAuth(session);
+            else supabaseClient.auth.onAuthStateChange((event, newSession) => { if (newSession) handleAuth(newSession); });
         }
 
         async function handleAuth(session) {
-            const user = session.user;
-            document.getElementById('user-name').textContent = user.user_metadata.full_name || 'Usuario';
-            const avatar = user.user_metadata.avatar_url;
-            if (avatar) {
-                document.getElementById('user-avatar').src = avatar;
-                document.getElementById('user-avatar-mobile').src = avatar;
+            document.getElementById('user-name').textContent = session.user.user_metadata.full_name || 'Usuario';
+            if (session.user.user_metadata.avatar_url) {
+                document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
+                document.getElementById('user-avatar-mobile').src = session.user.user_metadata.avatar_url;
             }
-            
-            try {
-                await initDashboard(session);
-                syncOfflineHistory(session);
-                
-                // Rastreo inicial inmediato
-                checkCurrentlyPlaying(session);
-                // Rastreo cada 5 segundos para máxima respuesta
-                setInterval(() => {
-                    console.log("Rastreando reproducción actual...");
-                    checkCurrentlyPlaying(session);
-                }, 5000);
-            } catch (e) {
-                console.error("Fallo crítico en initDashboard:", e);
-            }
+            await initDashboard(session);
+            syncOfflineHistory(session);
+            setInterval(() => checkCurrentlyPlaying(session), 5000);
         }
 
         bootstrap();
 
-        // Menús
         const dropdown = document.getElementById('profile-dropdown');
         document.getElementById('profile-btn')?.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('active'); });
-        document.getElementById('profile-btn-mobile')?.addEventListener('click', () => document.getElementById('mobile-profile-menu').classList.remove('hidden'));
-        document.getElementById('close-mobile-menu')?.addEventListener('click', () => document.getElementById('mobile-profile-menu').classList.add('hidden'));
         document.addEventListener('click', () => dropdown.classList.remove('active'));
         document.getElementById('logout-btn')?.addEventListener('click', () => supabaseClient.auth.signOut());
+        document.getElementById('close-list-modal').addEventListener('click', () => document.getElementById('list-modal').classList.add('hidden'));
     </script>
 </body>
 </html>

@@ -1,284 +1,188 @@
 import { supabaseClient } from './supabase.js';
 
-let globalStats = {
-    today: [],
-    week: [],
-    recent: [],
-    spotifyCache: {}
-};
-let _session = null;
+let dailyTracks = [];
+let weeklyTracks = [];
 
 /**
- * Inicializa el Dashboard cargando todas las estadísticas
+ * Inicializa las estadísticas del dashboard
  */
 export async function initDashboard(session) {
-    _session = session;
     const userId = session.user.id;
+    
+    // Cargar datos en paralelo para velocidad
+    await Promise.all([
+        loadTotalTime(userId),
+        loadTops(userId),
+        loadRecentHistory(userId)
+    ]);
 
-    // Inicializar Token de Spotify (vía TokenManager global)
-    if (typeof TokenManager !== 'undefined') {
-        const token = await TokenManager.init(session);
-        if (!token) {
-            const refreshed = await TokenManager.refresh(session);
-            if (!refreshed) return;
-        }
-    }
-
-    await loadStats(userId);
-    setupModals();
+    // Configurar eventos de clic para los marcadores
+    setupClickHandlers();
 }
 
-async function loadStats(userId) {
-    // 1. Obtener Historial Amplio de Supabase (últimas 1000 sesiones para cálculos precisos)
-    const { data: recentSessions, error } = await supabaseClient
+async function loadTotalTime(userId) {
+    const { data } = await supabaseClient
+        .from('listening_sessions')
+        .select('duration_ms')
+        .eq('user_id', userId);
+    
+    const totalMs = (data || []).reduce((acc, s) => acc + s.duration_ms, 0);
+    const hours = Math.floor(totalMs / 3600000);
+    const minutes = Math.floor((totalMs % 3600000) / 60000);
+    
+    const el = document.getElementById('stats-total-hours');
+    if (el) el.innerHTML = `${hours}<span class="text-lg opacity-40 ml-1">h</span> ${minutes}<span class="text-lg opacity-40 ml-1">m</span>`;
+}
+
+async function loadTops(userId) {
+    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+    const startOfWeek = new Date(); startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+    const [todayData, weekData] = await Promise.all([
+        getTopTracks(userId, startOfToday.toISOString()),
+        getTopTracks(userId, startOfWeek.toISOString())
+    ]);
+
+    dailyTracks = todayData;
+    weeklyTracks = weekData;
+
+    renderTopCard('card-top-today', todayData[0]);
+    renderTopCard('card-top-week', weekData[0]);
+}
+
+async function getTopTracks(userId, sinceIso) {
+    const { data } = await supabaseClient
+        .from('listening_sessions')
+        .select('track_id')
+        .eq('user_id', userId)
+        .gte('played_at', sinceIso);
+
+    if (!data || data.length === 0) return [];
+
+    // Contar ocurrencias
+    const counts = {};
+    data.forEach(s => counts[s.track_id] = (counts[s.track_id] || 0) + 1);
+
+    // Ordenar y tomar Top 5
+    const sortedIds = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(entry => entry[0]);
+
+    // Obtener detalles de Spotify (o caché local)
+    const tracks = [];
+    for (const id of sortedIds) {
+        const cached = localStorage.getItem('spotify_track_' + id);
+        if (cached) {
+            tracks.push({ ...JSON.parse(cached), play_count: counts[id] });
+        } else {
+            // Si no está en caché, podrías hacer un fetch a Spotify aquí
+            tracks.push({ id, name: "Cargando...", play_count: counts[id] });
+        }
+    }
+    return tracks;
+}
+
+function renderTopCard(elementId, track) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    if (!track) {
+        el.innerHTML += `<p class="text-[10px] text-neutral-600 italic">Sin datos aún.</p>`;
+        return;
+    }
+
+    const imgUrl = track.album?.images[0]?.url || '';
+    el.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), transparent), url(${imgUrl})`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+
+    const content = document.createElement('div');
+    content.className = "relative z-10";
+    content.innerHTML = `
+        <p class="text-xs font-black text-white truncate w-full">${track.name}</p>
+        <p class="text-[9px] text-[#1DB954] font-bold uppercase tracking-widest">${track.play_count} veces</p>
+    `;
+    el.appendChild(content);
+}
+
+function setupClickHandlers() {
+    document.getElementById('card-top-today')?.addEventListener('click', () => {
+        showListModal("Top de Hoy", dailyTracks);
+    });
+    document.getElementById('card-top-week')?.addEventListener('click', () => {
+        showListModal("Top Semanal", weeklyTracks);
+    });
+}
+
+function showListModal(title, tracks) {
+    const modal = document.getElementById('list-modal');
+    const body = document.getElementById('list-modal-body');
+    const titleEl = document.getElementById('list-modal-title');
+    
+    if (!modal || !body) return;
+
+    titleEl.textContent = title;
+    body.innerHTML = '';
+
+    if (tracks.length === 0) {
+        body.innerHTML = '<p class="text-center text-neutral-500 py-10 italic text-sm">No hay canciones registradas en este periodo.</p>';
+    } else {
+        tracks.forEach((track, index) => {
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-4 p-3 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors";
+            div.innerHTML = `
+                <span class="text-xl font-black text-neutral-700 w-6">${index + 1}</span>
+                <img src="${track.album?.images[0]?.url || ''}" class="w-12 h-12 rounded-lg shadow-lg">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-white truncate">${track.name}</p>
+                    <p class="text-xs text-neutral-500 truncate">${track.artists?.map(a => a.name).join(', ') || ''}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-black text-[#1DB954]">${track.play_count}</p>
+                    <p class="text-[8px] text-neutral-600 uppercase font-bold">Escuchas</p>
+                </div>
+            `;
+            body.appendChild(div);
+        });
+    }
+
+    modal.classList.remove('hidden');
+}
+
+async function loadRecentHistory(userId) {
+    const { data } = await supabaseClient
         .from('listening_sessions')
         .select('*')
         .eq('user_id', userId)
         .order('played_at', { ascending: false })
-        .limit(1000); 
+        .limit(10);
 
-    if (error) return;
+    const list = document.getElementById('recent-tracks-list');
+    if (!list) return;
+    list.innerHTML = '';
 
-    globalStats.recent = recentSessions;
-    
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todaySessions = recentSessions.filter(s => new Date(s.played_at) >= startOfToday);
-    
-    globalStats.today = getTopTracks(todaySessions, 5);
-    
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekSessions = recentSessions.filter(s => new Date(s.played_at) >= weekAgo);
-    globalStats.week = getTopTracks(weekSessions, 5);
-
-    // Consultar Metadata de Spotify (con caché local)
-    const idsToFetch = new Set();
-    globalStats.recent.slice(0, 5).forEach(s => idsToFetch.add(s.track_id));
-    globalStats.today.forEach(t => idsToFetch.add(t.id));
-    globalStats.week.forEach(t => idsToFetch.add(t.id));
-
-    // Usamos el token disponible en la sesión o BD
-    const { data: userData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', userId).single();
-    const token = userData?.spotify_access_token || _session.provider_token;
-
-    await fetchTracksFromSpotify(Array.from(idsToFetch), token);
-
-    // Renderizado UI
-    renderRecentList(globalStats.recent.slice(0, 5));
-    loadSocialSummaries(userId);
-    
-    if (globalStats.today.length > 0 && globalStats.spotifyCache[globalStats.today[0].id]) {
-        renderTopCard('card-top-today', globalStats.spotifyCache[globalStats.today[0].id], globalStats.today[0].ms);
-    }
-    if (globalStats.week.length > 0 && globalStats.spotifyCache[globalStats.week[0].id]) {
-        renderTopCard('card-top-week', globalStats.spotifyCache[globalStats.week[0].id], globalStats.week[0].ms);
-    }
-
-    let totalMs = recentSessions.reduce((acc, s) => acc + s.duration_ms, 0);
-    const hours = Math.floor(totalMs / 3600000);
-    const mins = Math.floor((totalMs % 3600000) / 60000);
-    const totalHoursEl = document.getElementById('stats-total-hours');
-    if (totalHoursEl) {
-        totalHoursEl.innerHTML = `${hours}<span class="text-lg font-normal text-neutral-600 ml-1">h</span> ${mins}<span class="text-lg font-normal text-neutral-600 ml-1">m</span>`;
-    }
-}
-
-async function loadSocialSummaries(userId) {
-    const todayContent = document.getElementById('social-today-content');
-    const weekContent = document.getElementById('social-week-content');
-
-    const { data: challenges } = await supabaseClient
-        .from('challenges')
-        .select(`*, creator:creator_id (display_name, avatar_url), opponent:opponent_id (display_name, avatar_url)`)
-        .or(`creator_id.eq.${userId},opponent_id.eq.${userId}`)
-        .eq('status', 'active')
-        .limit(1);
-
-    if (!challenges || challenges.length === 0) return;
-
-    const ch = challenges[0];
-    const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
-    const opponentId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
-
-    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
-    const startOfWeek = new Date(); startOfWeek.setDate(startOfWeek.getDate() - 7);
-    const actualStart = new Date(ch.start_date);
-
-    const dayFilter = new Date(Math.max(startOfToday, actualStart)).toISOString();
-    const weekFilter = new Date(Math.max(startOfWeek, actualStart)).toISOString();
-
-    const [myDay, friendDay, myWeek, friendWeek] = await Promise.all([
-        getListeningTime(userId, dayFilter),
-        getListeningTime(opponentId, dayFilter),
-        getListeningTime(userId, weekFilter),
-        getListeningTime(opponentId, weekFilter)
-    ]);
-
-    if (todayContent) renderSocialCard(todayContent, otherUser, myDay, friendDay);
-    if (weekContent) renderSocialCard(weekContent, otherUser, myWeek, friendWeek);
-}
-
-async function getListeningTime(userId, sinceIso) {
-    const { data } = await supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId).gte('played_at', sinceIso);
-    return (data || []).reduce((acc, s) => acc + s.duration_ms, 0);
-}
-
-function renderSocialCard(container, otherUser, myTime, friendTime) {
-    const isWinning = myTime >= friendTime;
-    const diffMins = Math.floor(Math.abs(myTime - friendTime) / 60000);
-    container.innerHTML = `
-        <img src="${otherUser.avatar_url || 'https://www.gravatar.com/avatar/0?d=mp'}" class="w-10 h-10 rounded-full border ${isWinning ? 'border-[#1DB954]' : 'border-red-500'}">
-        <div class="flex-1 min-w-0">
-            <p class="text-sm font-bold text-white truncate">${isWinning ? 'Vas ganando' : 'Te van ganando'}</p>
-            <p class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest">${diffMins} min de diferencia</p>
-        </div>
-    `;
-}
-
-function getTopTracks(sessions, limit) {
-    const counts = {};
-    sessions.forEach(s => {
-        counts[s.track_id] = (counts[s.track_id] || 0) + s.duration_ms;
-    });
-    return Object.entries(counts)
-        .map(([id, ms]) => ({ id, ms }))
-        .sort((a, b) => b.ms - a.ms)
-        .slice(0, limit);
-}
-
-async function fetchTracksFromSpotify(ids, token) {
-    const missingIds = ids.filter(id => !globalStats.spotifyCache[id]);
-    for (const id of missingIds) {
-        const local = localStorage.getItem('spotify_track_' + id);
-        if (local) {
-            globalStats.spotifyCache[id] = JSON.parse(local);
-            continue;
-        }
-        try {
-            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                globalStats.spotifyCache[id] = data;
-                localStorage.setItem('spotify_track_' + id, JSON.stringify(data));
-            }
-        } catch (e) {}
-    }
-}
-
-function renderRecentList(sessions, containerId = 'recent-tracks-list') {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = sessions.map(s => {
-        const t = globalStats.spotifyCache[s.track_id];
-        if (!t) return '';
-        return `
-            <div class="flex items-center gap-4 p-2 hover:bg-white/5 rounded-xl transition-colors">
-                <img src="${t.album.images[0]?.url}" class="w-10 h-10 rounded shadow-lg">
-                <div class="flex-1 overflow-hidden">
-                    <p class="text-sm font-bold text-white truncate">${t.name}</p>
-                    <p class="text-xs text-neutral-500 truncate">${t.artists[0].name}</p>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function renderTopCard(id, track, ms) {
-    const container = document.getElementById(id);
-    if (!container) return;
-    const mins = Math.floor(ms / 60000);
-    container.innerHTML = `
-        <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">${id.includes('today') ? 'Más escuchada (Hoy)' : 'Más escuchada (Semana)'}</h3>
-        <div class="flex items-center gap-3">
-            <img src="${track.album.images[0]?.url}" class="w-12 h-12 rounded-lg shadow-xl">
-            <div class="flex-1 overflow-hidden">
-                <p class="text-sm font-bold text-white truncate">${track.name}</p>
-                <p class="text-[10px] text-[#1DB954] font-black uppercase">${mins} MINUTOS</p>
-            </div>
-        </div>
-    `;
-}
-
-function setupModals() {
-    const listModal = document.getElementById('list-modal');
-    const modalContent = document.getElementById('list-modal-content');
-    
-    // Clic Historial Reciente (Ya lo tenías, lo mantenemos)
-    document.getElementById('recent-history-card')?.addEventListener('click', () => {
-        document.getElementById('list-modal-title').textContent = "Historial Completo";
-        renderRecentList(globalStats.recent, 'list-modal-body');
-        listModal.classList.remove('hidden');
-    });
-
-    // --- RESTAURADO: Clic Top Hoy ---
-    document.getElementById('card-top-today')?.addEventListener('click', () => {
-        document.getElementById('list-modal-title').textContent = "Obsesión de Hoy";
-        renderTopListInModal(globalStats.today, 'Hoy');
-        listModal.classList.remove('hidden');
-    });
-
-    // --- RESTAURADO: Clic Top Semana ---
-    document.getElementById('card-top-week')?.addEventListener('click', () => {
-        document.getElementById('list-modal-title').textContent = "Rey de la Semana";
-        renderTopListInModal(globalStats.week, 'Semana');
-        listModal.classList.remove('hidden');
-    });
-
-    document.getElementById('close-list-modal')?.addEventListener('click', () => listModal.classList.add('hidden'));
-}
-
-function renderTopListInModal(topArray, typeName) {
-    const modalBody = document.getElementById('list-modal-body');
-    if (!modalBody) return;
-    modalBody.innerHTML = '';
-
-    if (topArray.length === 0) {
-        modalBody.innerHTML = '<p class="text-neutral-500 text-center py-10">No hay datos suficientes aún.</p>';
+    if (!data || data.length === 0) {
+        list.innerHTML = '<p class="text-center text-neutral-600 py-10 italic">Escucha algo en Spotify para empezar.</p>';
         return;
     }
 
-    // Top 1 (El Ganador)
-    const t1 = globalStats.spotifyCache[topArray[0].id];
-    if (t1) {
-        const mins1 = Math.floor(topArray[0].ms / 60000);
-        modalBody.innerHTML += `
-            <div class="bg-gradient-to-br from-[#1DB954]/20 to-black p-8 rounded-[2rem] border border-[#1DB954]/30 text-center mb-8 shadow-2xl">
-                <p class="text-[#1DB954] font-black text-[10px] uppercase tracking-[0.3em] mb-6">👑 TU #1 MÁS ESCUCHADA</p>
-                <img src="${t1.album.images[0]?.url}" class="w-40 h-40 mx-auto rounded-2xl shadow-2xl mb-6 object-cover hover:scale-105 transition-transform duration-500">
-                <h3 class="text-2xl font-black text-white mb-2">${t1.name}</h3>
-                <p class="text-neutral-400 font-bold mb-6">${t1.artists[0].name}</p>
-                <div class="inline-flex items-center gap-3 bg-[#1DB954] text-black px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest">
-                    ${mins1} minutos totales
-                </div>
+    data.forEach(session => {
+        const cached = localStorage.getItem('spotify_track_' + session.track_id);
+        const track = cached ? JSON.parse(cached) : { name: "Canción", artists: [{name: "Artista"}], album: {images:[{url:''}]} };
+        
+        const div = document.createElement('div');
+        div.className = "flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all group";
+        div.innerHTML = `
+            <img src="${track.album?.images[0]?.url || ''}" class="w-12 h-12 rounded-xl shadow-lg">
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold text-white truncate group-hover:text-[#1DB954] transition-colors">${track.name}</p>
+                <p class="text-xs text-neutral-500 truncate">${track.artists[0].name}</p>
+            </div>
+            <div class="text-right shrink-0">
+                <p class="text-[10px] font-mono text-neutral-600">${new Date(session.played_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
         `;
-    }
-
-    // Runners up (Del #2 al #5)
-    if (topArray.length > 1) {
-        modalBody.innerHTML += '<h4 class="font-black text-neutral-500 uppercase tracking-widest text-[10px] mb-4 pl-2">Pisándole los talones:</h4>';
-        
-        topArray.slice(1).forEach((item, index) => {
-            const t = globalStats.spotifyCache[item.id];
-            if (!t) return;
-            const mins = Math.floor(item.ms / 60000);
-
-            modalBody.innerHTML += `
-                <div class="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors mb-3">
-                    <span class="text-neutral-600 font-black w-6 text-center italic text-xl">#${index + 2}</span>
-                    <img src="${t.album.images[0]?.url}" class="w-14 h-14 rounded-xl object-cover shadow-lg">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-white truncate">${t.name}</p>
-                        <p class="text-[10px] text-neutral-500 font-bold truncate uppercase tracking-tighter">${t.artists[0].name}</p>
-                    </div>
-                    <div class="text-right shrink-0">
-                        <span class="text-xs font-black text-[#1DB954] bg-[#1DB954]/10 px-3 py-1 rounded-full">${mins}m</span>
-                    </div>
-                </div>
-            `;
-        });
-    }
+        list.appendChild(div);
+    });
 }
