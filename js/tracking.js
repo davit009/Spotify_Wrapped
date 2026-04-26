@@ -171,34 +171,32 @@ function stopLocalProgress() {
 
 function showNowPlaying(track, isPlaying = true, progressMs = 0) {
     const card = document.getElementById('now-playing-card');
-    const title = document.getElementById('np-title');
-    const artist = document.getElementById('np-artist');
-    const image = document.getElementById('np-image');
-    const playIcon = document.getElementById('play-icon');
-    const pauseIcon = document.getElementById('pause-icon');
+    const container = document.getElementById('embed-container');
+    if (!card || !container) return;
 
-    if (!card) return;
-
-    title.textContent = track.name;
-    artist.textContent = track.artists.map(a => a.name).join(', ');
-
-    lastKnownProgress = progressMs;
-    lastKnownDuration = track.duration_ms;
-    updateProgressUI(lastKnownProgress, lastKnownDuration);
-
-    if (isPlaying) {
-        playIcon?.classList.add('hidden');
-        pauseIcon?.classList.remove('hidden');
-        startLocalProgress();
-    } else {
-        playIcon?.classList.remove('hidden');
-        pauseIcon?.classList.add('hidden');
-        stopLocalProgress();
+    const trackId = track.id;
+    const embedUrl = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
+    
+    // Solo actualizar el Iframe si la canción CAMBIÓ (para evitar parpadeos)
+    const currentIframe = container.querySelector('iframe');
+    if (!currentIframe || currentIframe.dataset.trackId !== trackId) {
+        container.innerHTML = `
+            <iframe
+                src="${embedUrl}"
+                width="100%"
+                height="152"
+                frameBorder="0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                data-track-id="${trackId}"
+                style="border-radius: 12px;"
+            ></iframe>
+        `;
     }
 
+    // Fondo dinámico
     if (track.album.images.length > 0) {
         const albumUrl = track.album.images[0].url;
-        image.src = albumUrl;
         const bg = document.getElementById('album-bg');
         if (bg) {
             const currentBg = bg.style.backgroundImage;
@@ -207,6 +205,7 @@ function showNowPlaying(track, isPlaying = true, progressMs = 0) {
             bg.classList.add('visible');
         }
     }
+
     card.classList.remove('hidden');
 }
 
