@@ -80,22 +80,35 @@
         <!-- BUSCADOR DE AMIGOS (MODAL) -->
         <div id="friend-modal" class="fixed inset-0 bg-black/90 backdrop-blur-xl z-[200] hidden flex items-center justify-center p-4">
             <div class="bg-[#121212] p-8 rounded-[3rem] border border-white/5 w-full max-w-md shadow-2xl">
-                <div class="flex justify-between items-center mb-8">
+                <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-black italic">Amigos</h2>
                     <button id="close-friend-modal" class="bg-white/5 p-2 rounded-full hover:bg-white/10"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
                 </div>
+
+                <!-- PESTAÑAS DEL MODAL -->
+                <div class="flex gap-4 mb-6 border-b border-white/5 pb-2">
+                    <button id="tab-search" class="text-[9px] font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954] pb-2">Buscar</button>
+                    <button id="tab-requests" class="text-[9px] font-black uppercase tracking-widest text-neutral-500 hover:text-white pb-2 relative">Solicitudes <span id="req-dot" class="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full hidden"></span></button>
+                    <button id="tab-manage" class="text-[9px] font-black uppercase tracking-widest text-neutral-500 hover:text-white pb-2">Duelos</button>
+                </div>
                 
                 <div class="space-y-6">
-                    <div class="relative">
-                        <input type="text" id="friend-search-input" placeholder="Nombre de usuario..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:border-[#1DB954] transition-all">
-                        <button id="search-btn" class="absolute right-3 top-3 bg-[#1DB954] text-black p-2 rounded-xl"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></button>
+                    <!-- SECCIÓN BUSCAR -->
+                    <div id="section-search" class="space-y-4">
+                        <div class="relative">
+                            <input type="text" id="friend-search-input" placeholder="Nombre de usuario..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:border-[#1DB954] transition-all">
+                        </div>
+                        <div id="friend-results" class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2"></div>
                     </div>
 
-                    <div id="friend-results" class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2"></div>
-                    
-                    <div class="pt-6 border-t border-white/5">
-                        <h4 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Solicitudes Pendientes</h4>
-                        <div id="friend-requests" class="space-y-3"></div>
+                    <!-- SECCIÓN SOLICITUDES -->
+                    <div id="section-requests" class="hidden space-y-4">
+                        <div id="friend-requests" class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+
+                    <!-- SECCIÓN GESTIONAR DUELOS -->
+                    <div id="section-manage" class="hidden space-y-4">
+                        <div id="active-duels-list" class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar"></div>
                     </div>
                 </div>
             </div>
