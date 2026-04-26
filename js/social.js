@@ -2,13 +2,9 @@ import { supabaseClient } from './supabase.js';
 
 let activeChallenges = [];
 
-/**
- * Inicializa la lógica social
- */
 export async function initSocial(currentUser) {
     const searchInput = document.getElementById('user-search-input');
     const searchResults = document.getElementById('user-search-results');
-
     if (searchInput) {
         let searchTimeout;
         searchInput.addEventListener('input', (e) => {
@@ -23,13 +19,9 @@ export async function initSocial(currentUser) {
             }, 400);
         });
     }
-
     loadPendingRequests(currentUser.id);
 }
 
-/**
- * Carga el contenido dinámico de la página Social
- */
 export async function loadSocialPage(userId) {
     const { data: challenges } = await supabaseClient
         .from('challenges')
@@ -43,20 +35,12 @@ export async function loadSocialPage(userId) {
     renderLeaders(userId);
 }
 
-/**
- * Renderiza el carrusel de comparativas (Arena)
- */
 async function renderArenaCarousel(userId) {
     const container = document.getElementById('arena-carousel');
     if (!container) return;
 
     if (activeChallenges.length === 0) {
-        container.innerHTML = `
-            <div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-center">
-                <h3 class="text-xl font-black italic text-white mb-2">Sin duelos activos</h3>
-                <p class="text-xs text-neutral-500">Invita a alguien desde el menú de perfil.</p>
-            </div>
-        `;
+        container.innerHTML = `<div class="arena-card flex flex-col items-center justify-center glass rounded-[3rem] p-20 text-center italic text-neutral-500">Sin duelos activos.</div>`;
         return;
     }
 
@@ -76,46 +60,81 @@ async function renderArenaCarousel(userId) {
 
         const myMins = Math.floor(myTime / 60000);
         const friendMins = Math.floor(friendTime / 60000);
-        const isWinning = myTime >= friendTime;
         
-        // CÁLCULO DE PROGRESO CORREGIDO
-        // Si ambos tienen 0, la barra está al 50%. Si uno tiene más, la barra se inclina.
-        const total = myTime + friendTime;
-        const myPercent = total === 0 ? 50 : (myTime / total) * 100;
-        const barColor = isWinning ? '#1DB954' : '#ef4444';
+        // Lógica de porcentaje: 
+        // El que tenga más tiempo hoy define el 100% de la visualización (mínimo 1 min para que no salga vacía)
+        const maxMins = Math.max(myMins, friendMins, 1);
+        const myPercent = (myMins / maxMins) * 100;
+        const friendPercent = (friendMins / maxMins) * 100;
 
         const card = document.createElement('div');
-        card.className = "arena-card glass rounded-[3rem] p-10 flex flex-col gap-8 relative overflow-hidden";
+        card.className = "arena-card glass rounded-[3rem] p-8 sm:p-12 flex flex-col gap-10 relative overflow-hidden";
         card.innerHTML = `
-            <div class="flex justify-between items-center relative z-10 px-4">
+            <div class="flex justify-between items-center relative z-10">
                 <div class="flex flex-col items-center gap-4 flex-1">
-                    <img src="${document.getElementById('user-avatar')?.src || ''}" class="w-16 h-16 rounded-full border-4 border-white/5 shadow-2xl">
-                    <div class="text-center"><p class="text-2xl font-black italic">${myMins}<span class="text-[10px] font-normal opacity-50 ml-1">m</span></p></div>
+                    <div class="relative">
+                        <img src="${document.getElementById('user-avatar')?.src || ''}" class="w-20 h-20 rounded-full border-4 border-white/5 shadow-2xl">
+                        ${myMins >= friendMins && myMins > 0 ? '<div class="absolute -top-2 -right-2 bg-[#1DB954] text-black text-[8px] font-black px-2 py-1 rounded-full animate-bounce shadow-lg">LÍDER</div>' : ''}
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs font-black uppercase tracking-widest text-[#1DB954]">Tú</p>
+                        <p class="text-4xl font-black italic">${myMins}<span class="text-xs font-normal opacity-50 ml-1">min</span></p>
+                    </div>
                 </div>
-                <div class="flex flex-col items-center px-4"><div class="text-[10px] font-black opacity-20 uppercase tracking-widest">VS</div></div>
+
+                <div class="flex flex-col items-center px-4"><div class="text-xs font-black opacity-10">VS</div></div>
+
                 <div class="flex flex-col items-center gap-4 flex-1">
-                    <img src="${otherUser.avatar_url || ''}" class="w-16 h-16 rounded-full border-4 border-white/5 shadow-2xl">
-                    <div class="text-center"><p class="text-2xl font-black italic">${friendMins}<span class="text-[10px] font-normal opacity-50 ml-1">m</span></p></div>
+                    <div class="relative">
+                        <img src="${otherUser.avatar_url || ''}" class="w-20 h-20 rounded-full border-4 border-white/5 shadow-2xl">
+                        ${friendMins > myMins ? '<div class="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-full animate-bounce shadow-lg">LÍDER</div>' : ''}
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs font-black uppercase tracking-widest text-red-500">${otherUser.display_name}</p>
+                        <p class="text-4xl font-black italic">${friendMins}<span class="text-xs font-normal opacity-50 ml-1">min</span></p>
+                    </div>
                 </div>
             </div>
 
-            <div class="space-y-4 px-4">
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill shadow-[0_0_20px_rgba(29,185,84,0.1)]" 
-                         style="width: ${myPercent}%; background-color: ${barColor}">
+            <div class="space-y-6 relative z-10">
+                <!-- Tu Barra (Siempre Verde) -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[9px] font-black uppercase tracking-widest text-neutral-500">Tu Energía</span>
+                        <span class="text-[10px] font-bold text-[#1DB954]">${myMins} min</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill winning-pulse bg-[#1DB954]" style="width: ${myPercent}%"></div>
                     </div>
                 </div>
-                <p class="text-center text-[10px] font-black uppercase tracking-[0.2em] ${isWinning ? 'text-[#1DB954]' : 'text-red-500'}">
-                    ${isWinning ? '¡Vas ganando hoy!' : 'Te van ganando'}
+
+                <!-- Su Barra (Siempre Roja) -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[9px] font-black uppercase tracking-widest text-neutral-500">Rival</span>
+                        <span class="text-[10px] font-bold text-red-500">${friendMins} min</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill bg-red-500/40" style="width: ${friendPercent}%; border-right: 2px solid #ef4444;"></div>
+                    </div>
+                </div>
+
+                <p class="text-center text-[10px] font-black uppercase tracking-[0.3em] mt-4 ${myMins >= friendMins ? 'text-[#1DB954]' : 'text-red-500'}">
+                    ${myMins >= friendMins ? '¡Dominando la Arena!' : '¡Alcanza a tu rival!'}
                 </p>
             </div>
 
             <button class="cancel-duel-btn absolute top-6 right-6 text-neutral-800 hover:text-red-500 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         `;
         container.appendChild(card);
         
+        // Timeout para activar la animación de la barra tras el render
+        setTimeout(() => {
+            card.querySelectorAll('.progress-bar-fill').forEach(f => f.style.width = f.style.width);
+        }, 50);
+
         card.querySelector('.cancel-duel-btn').addEventListener('click', () => {
             if(confirm("¿Cancelar este duelo anual?")) respondChallenge(ch.id, 'finished', userId);
         });

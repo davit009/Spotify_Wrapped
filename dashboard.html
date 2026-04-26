@@ -133,7 +133,14 @@
             try {
                 await initDashboard(session);
                 syncOfflineHistory(session);
-                setInterval(() => checkCurrentlyPlaying(session), 10000);
+                
+                // Rastreo inicial inmediato
+                checkCurrentlyPlaying(session);
+                // Rastreo cada 5 segundos para máxima respuesta
+                setInterval(() => {
+                    console.log("Rastreando reproducción actual...");
+                    checkCurrentlyPlaying(session);
+                }, 5000);
             } catch (e) {
                 console.error("Fallo crítico en initDashboard:", e);
             }
