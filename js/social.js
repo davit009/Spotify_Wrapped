@@ -5,7 +5,7 @@ let activeChallenges = [];
 let currentFilter = 'today';
 
 export async function initSocial(currentUser) {
-    // Configurar botones de filtro
+    // Configurar botones de filtro de la Arena
     const filters = ['today', 'week', 'month'];
     filters.forEach(f => {
         document.getElementById(`filter-${f}`)?.addEventListener('click', () => {
@@ -15,16 +15,23 @@ export async function initSocial(currentUser) {
         });
     });
 
-    // Configurar buscador de amigos (Boton Buscar Amigos -> Modal)
+    // Abrir Modal
     document.getElementById('add-friend-btn')?.addEventListener('click', () => {
         document.getElementById('friend-modal').classList.remove('hidden');
-        loadPendingRequests(currentUser.id);
+        switchTab('search', currentUser.id);
     });
+
+    // Cerrar Modal
     document.getElementById('close-friend-modal')?.addEventListener('click', () => {
         document.getElementById('friend-modal').classList.add('hidden');
     });
 
-    // Buscador de amigos real
+    // Control de Pestañas del Modal
+    document.getElementById('tab-search')?.addEventListener('click', () => switchTab('search', currentUser.id));
+    document.getElementById('tab-requests')?.addEventListener('click', () => switchTab('requests', currentUser.id));
+    document.getElementById('tab-manage')?.addEventListener('click', () => switchTab('manage', currentUser.id));
+
+    // Buscador de amigos
     const searchInput = document.getElementById('friend-search-input');
     const searchResults = document.getElementById('friend-results');
     if (searchInput) {
@@ -41,6 +48,26 @@ export async function initSocial(currentUser) {
     }
 
     loadPendingRequests(currentUser.id);
+}
+
+function switchTab(tabName, userId) {
+    const tabs = ['search', 'requests', 'manage'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const section = document.getElementById(`section-${t}`);
+        if (t === tabName) {
+            btn.classList.add('text-[#1DB954]', 'border-[#1DB954]', 'border-b-2');
+            btn.classList.remove('text-neutral-500');
+            section.classList.remove('hidden');
+        } else {
+            btn.classList.remove('text-[#1DB954]', 'border-[#1DB954]', 'border-b-2');
+            btn.classList.add('text-neutral-500');
+            section.classList.add('hidden');
+        }
+    });
+
+    if (tabName === 'requests') loadPendingRequests(userId);
+    if (tabName === 'manage') loadActiveChallengesList(userId);
 }
 
 function updateFilterUI() {
@@ -82,7 +109,6 @@ async function renderArena(userId) {
         const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
         const opponentId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
 
-        // Calcular tiempos según el filtro
         const now = new Date();
         let startDate = new Date();
         if (currentFilter === 'today') startDate.setHours(0,0,0,0);
@@ -100,7 +126,6 @@ async function renderArena(userId) {
         const myPercent = total === 0 ? 50 : (myTime / total) * 100;
         const friendPercent = 100 - myPercent;
 
-        // Historial de los últimos 7 días (Puntitos)
         const historyDots = await getWinHistory(userId, opponentId);
 
         const card = document.createElement('div');
@@ -119,20 +144,15 @@ async function renderArena(userId) {
                     <p class="text-2xl font-black italic">${friendMins}m</p>
                 </div>
             </div>
-
-            <!-- BARRA TIRA Y AFLOJA -->
             <div class="mb-6">
                 <div class="h-3 bg-white/5 rounded-full flex overflow-hidden">
                     <div class="h-full bg-[#1DB954] transition-all duration-1000" style="width: ${myPercent}%"></div>
                     <div class="h-full bg-red-500/80 transition-all duration-1000" style="width: ${friendPercent}%"></div>
                 </div>
             </div>
-
-            <!-- CALENDARIO DE VICTORIAS (ÚLTIMOS 7 DÍAS) -->
             <div class="flex justify-center gap-2 mb-4">
                 ${historyDots}
             </div>
-
             <p class="text-center text-[9px] font-black uppercase tracking-[0.2em] ${myMins >= friendMins ? 'text-[#1DB954]' : 'text-red-500'}">
                 ${myMins >= friendMins ? '¡Vas ganando!' : '¡Te van ganando!'}
             </p>
@@ -141,24 +161,43 @@ async function renderArena(userId) {
     }
 }
 
+async function loadActiveChallengesList(userId) {
+    const list = document.getElementById('active-duels-list');
+    list.innerHTML = activeChallenges.length === 0 ? '<p class="text-center text-neutral-600 text-[10px] py-10 italic">No hay duelos activos.</p>' : '';
+    
+    activeChallenges.forEach(ch => {
+        const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
+        const div = document.createElement('div');
+        div.className = "flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10";
+        div.innerHTML = `
+            <div class="flex items-center gap-3">
+                <img src="${otherUser.avatar_url || ''}" class="w-10 h-10 rounded-full">
+                <div>
+                    <h4 class="text-xs font-bold text-white">${otherUser.display_name}</h4>
+                    <p class="text-[8px] text-neutral-500 uppercase tracking-widest">Duelo Activo</p>
+                </div>
+            </div>
+            <button class="text-[9px] font-black uppercase text-red-500/50 hover:text-red-500 transition-colors">Terminar</button>
+        `;
+        list.appendChild(div);
+        div.querySelector('button').addEventListener('click', () => {
+            if(confirm(`¿Seguro que quieres terminar el duelo con ${otherUser.display_name}?`)) respondChallenge(ch.id, 'finished', userId);
+        });
+    });
+}
+
 async function getWinHistory(userId, friendId) {
     let dots = '';
     for (let i = 6; i >= 0; i--) {
         const start = new Date(); start.setDate(start.getDate() - i); start.setHours(0,0,0,0);
         const end = new Date(start); end.setHours(23,59,59,999);
-        
-        const [myTime, friendTime] = await Promise.all([
+        const [myT, friT] = await Promise.all([
             getListeningTimeInRange(userId, start.toISOString(), end.toISOString()),
             getListeningTimeInRange(friendId, start.toISOString(), end.toISOString())
         ]);
-
-        if (myTime === 0 && friendTime === 0) {
-            dots += `<div class="win-dot bg-white/5"></div>`;
-        } else if (myTime >= friendTime) {
-            dots += `<div class="win-dot win-user" title="Ganaste este día"></div>`;
-        } else {
-            dots += `<div class="win-dot win-friend" title="Perdiste este día"></div>`;
-        }
+        if (myT === 0 && friT === 0) dots += `<div class="win-dot bg-white/5"></div>`;
+        else if (myT >= friT) dots += `<div class="win-dot win-user"></div>`;
+        else dots += `<div class="win-dot win-friend"></div>`;
     }
     return dots;
 }
@@ -167,48 +206,26 @@ async function updateStreakAndMatch(userId) {
     const extraSection = document.getElementById('extra-stats-section');
     const streakCard = document.getElementById('streak-card');
     const matchCard = document.getElementById('match-card');
-    
     if (activeChallenges.length === 0) { extraSection.classList.add('hidden'); return; }
     extraSection.classList.remove('hidden');
-
     const ch = activeChallenges[0];
     const friendId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
-
-    // 1. Calcular Racha
     let streakCount = 0;
     for (let i = 0; i < 30; i++) {
         const start = new Date(); start.setDate(start.getDate() - i); start.setHours(0,0,0,0);
         const end = new Date(start); end.setHours(23,59,59,999);
-        const [myT, friT] = await Promise.all([
-            getListeningTimeInRange(userId, start.toISOString(), end.toISOString()),
-            getListeningTimeInRange(friendId, start.toISOString(), end.toISOString())
-        ]);
-        if (myT > friT) streakCount++;
-        else if (i === 0) continue; // Hoy aún no termina
-        else break;
+        const [myT, friT] = await Promise.all([getListeningTimeInRange(userId, start.toISOString(), end.toISOString()), getListeningTimeInRange(friendId, start.toISOString(), end.toISOString())]);
+        if (myT > friT) streakCount++; else if (i === 0) continue; else break;
     }
-
-    if (streakCount >= 2) {
-        streakCard.classList.remove('hidden');
-        document.getElementById('streak-days').textContent = streakCount;
-    } else {
-        streakCard.classList.add('hidden');
-    }
-
-    // 2. Cargar Match Musical
+    if (streakCount >= 2) { streakCard.classList.remove('hidden'); document.getElementById('streak-days').textContent = streakCount; }
+    else streakCard.classList.add('hidden');
     const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
     const { data: myS } = await supabaseClient.from('listening_sessions').select('track_id').eq('user_id', userId).gte('played_at', startOfToday.toISOString());
     const { data: friS } = await supabaseClient.from('listening_sessions').select('track_id').eq('user_id', friendId).gte('played_at', startOfToday.toISOString());
-    
     const myTracks = new Set((myS || []).map(s => s.track_id));
     const common = (friS || []).filter(s => myTracks.has(s.track_id));
-    
-    if (common.length > 0) {
-        matchCard.classList.remove('hidden');
-        document.getElementById('match-count').textContent = common.length;
-    } else {
-        matchCard.classList.add('hidden');
-    }
+    if (common.length > 0) { matchCard.classList.remove('hidden'); document.getElementById('match-count').textContent = common.length; }
+    else matchCard.classList.add('hidden');
 }
 
 async function getListeningTime(userId, sinceIso) {
@@ -221,11 +238,12 @@ async function getListeningTimeInRange(userId, start, end) {
     return (data || []).reduce((acc, s) => acc + s.duration_ms, 0);
 }
 
-// RESTO DE FUNCIONES DE AMIGOS
 async function loadPendingRequests(userId) {
     const container = document.getElementById('friend-requests');
+    const dot = document.getElementById('req-dot');
     const { data: requests } = await supabaseClient.from('challenges').select(`*, creator:creator_id (display_name, avatar_url)`).eq('opponent_id', userId).eq('status', 'pending');
-    container.innerHTML = (requests || []).length === 0 ? '<p class="text-center text-neutral-600 text-[10px] py-4">Sin solicitudes.</p>' : '';
+    if (requests?.length > 0) dot?.classList.remove('hidden'); else dot?.classList.add('hidden');
+    container.innerHTML = (requests || []).length === 0 ? '<p class="text-center text-neutral-600 text-[10px] py-10 italic">Sin solicitudes pendientes.</p>' : '';
     requests?.forEach(req => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5";
@@ -238,6 +256,7 @@ async function loadPendingRequests(userId) {
 async function respondChallenge(challengeId, status, userId) {
     await supabaseClient.from('challenges').update({ status }).eq('id', challengeId);
     loadSocialPage(userId);
+    loadActiveChallengesList(userId);
 }
 
 function renderSearchResults(users, currentUserId) {
