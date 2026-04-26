@@ -171,42 +171,26 @@ function stopLocalProgress() {
 
 function showNowPlaying(track, isPlaying = true, progressMs = 0) {
     const card = document.getElementById('now-playing-card');
-    const container = document.getElementById('embed-container');
     const recCard = document.getElementById('recommendation-card');
-    if (!card || !container) return;
+    if (!card) return;
 
     // Ocultar recomendaciones si hay música en vivo
     if (recCard) recCard.classList.add('hidden');
 
-    const trackId = track.id;
-    const embedUrl = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
+    // Actualizar Textos
+    document.getElementById('np-title').textContent = track.name;
+    document.getElementById('np-artist').textContent = track.artists.map(a => a.name).join(', ');
     
-    // Sincronizar tiempos y barra
-    lastKnownProgress = progressMs;
-    lastKnownDuration = track.duration_ms;
-    updateProgressUI(lastKnownProgress, lastKnownDuration);
-
-    if (isPlaying) startLocalProgress();
-    else stopLocalProgress();
-
-    const currentIframe = container.querySelector('iframe');
-    if (!currentIframe || currentIframe.dataset.trackId !== trackId) {
-        container.innerHTML = `
-            <iframe
-                src="${embedUrl}"
-                width="100%"
-                height="152"
-                frameBorder="0"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-                data-track-id="${trackId}"
-                style="border-radius: 12px;"
-            ></iframe>
-        `;
-    }
-
+    // Actualizar Portada y Fondo Blur
     if (track.album.images.length > 0) {
         const albumUrl = track.album.images[0].url;
+        document.getElementById('np-image').src = albumUrl;
+        
+        // Blur de fondo de la tarjeta
+        const blurBg = document.getElementById('np-blur-bg');
+        if (blurBg) blurBg.style.backgroundImage = `url(${albumUrl})`;
+
+        // Blur de fondo de toda la pantalla (opcional, lo mantenemos si quieres)
         const bg = document.getElementById('album-bg');
         if (bg) {
             const currentBg = bg.style.backgroundImage;
@@ -214,6 +198,34 @@ function showNowPlaying(track, isPlaying = true, progressMs = 0) {
             if (currentBg !== newBg) bg.style.backgroundImage = newBg;
             bg.classList.add('visible');
         }
+    }
+
+    // Sincronizar tiempos y barra
+    lastKnownProgress = progressMs;
+    lastKnownDuration = track.duration_ms;
+    updateProgressUI(lastKnownProgress, lastKnownDuration);
+
+    // Actualizar Estado de Iconos
+    const playIcon = document.getElementById('play-icon-custom');
+    const pauseIcon = document.getElementById('pause-icon-custom');
+    const playPauseBtn = document.getElementById('player-play-pause-custom');
+
+    if (isPlaying) {
+        playIcon?.classList.add('hidden');
+        pauseIcon?.classList.remove('hidden');
+        startLocalProgress();
+    } else {
+        playIcon?.classList.remove('hidden');
+        pauseIcon?.classList.add('hidden');
+        stopLocalProgress();
+    }
+
+    // Configurar el botón para que controle el dispositivo activo
+    if (playPauseBtn) {
+        playPauseBtn.onclick = () => {
+            const action = isPlaying ? 'pause' : 'play';
+            spotifyPlayerAction(action, 'PUT');
+        };
     }
 
     card.classList.remove('hidden');

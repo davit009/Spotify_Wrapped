@@ -49,27 +49,53 @@
         
         <!-- Columna Izquierda (En Vivo y Últimas Escuchadas) -->
         <div class="lg:col-span-2 flex flex-col gap-6">
-            <!-- Reproductor Dinámico (Spotify Embed) -->
-            <div id="now-playing-card" class="hidden transition-all duration-700">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="relative flex h-2 w-2">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1DB954] opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-[#1DB954]"></span>
-                    </span>
-                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#1DB954]">En Vivo</span>
-                </div>
-                <div id="embed-container" class="rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-white/5 bg-[#282828]">
-                    <!-- El iframe se inyecta dinámicamente aquí -->
-                </div>
+            <!-- Reproductor Premium Custom (Control Remoto Real) -->
+            <div id="now-playing-card" class="hidden relative overflow-hidden bg-[#181818] rounded-2xl border border-white/5 shadow-2xl transition-all duration-500 group">
+                <!-- Fondo con desenfoque dinámico sutil dentro de la tarjeta -->
+                <div id="np-blur-bg" class="absolute inset-0 opacity-20 blur-3xl scale-150 pointer-events-none transition-all duration-1000"></div>
                 
-                <!-- Barra de Progreso Sincronizada -->
-                <div class="mt-4 px-1">
-                    <div class="flex justify-between text-[10px] text-neutral-500 mb-1.5 font-mono tracking-tighter">
+                <div class="relative z-10 p-5 flex flex-col sm:flex-row items-center gap-5">
+                    <!-- Portada con efecto de profundidad -->
+                    <div class="relative shrink-0 group/cover">
+                        <img id="np-image" class="w-24 h-24 sm:w-28 sm:h-28 rounded-lg shadow-[0_12px_40px_rgba(0,0,0,0.5)] object-cover transition-transform duration-500 group-hover:scale-105" src="" alt="Album Art">
+                        <div class="absolute inset-0 bg-black/20 rounded-lg opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center">
+                            <svg class="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM10 16.5v-9l6 4.5-6 4.5z"/></svg>
+                        </div>
+                    </div>
+
+                    <!-- Info de la Canción -->
+                    <div class="flex-1 min-w-0 text-center sm:text-left">
+                        <div class="flex items-center justify-center sm:justify-start gap-2 mb-2">
+                            <span class="flex h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse"></span>
+                            <span class="text-[10px] font-black uppercase tracking-[0.3em] text-[#1DB954]">En Vivo</span>
+                        </div>
+                        <h3 id="np-title" class="text-xl sm:text-2xl font-black text-white truncate drop-shadow-sm">Cargando...</h3>
+                        <p id="np-artist" class="text-sm sm:text-base text-neutral-400 truncate mb-4">Artista</p>
+
+                        <!-- Controles de Reproducción (Controlan tu dispositivo activo) -->
+                        <div class="flex items-center justify-center sm:justify-start gap-6">
+                            <button onclick="spotifyPlayerAction('previous', 'POST')" class="text-neutral-400 hover:text-white transition-colors p-1" title="Anterior">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                            </button>
+                            <button id="player-play-pause-custom" class="bg-white text-black p-3 rounded-full hover:scale-110 active:scale-95 transition-all shadow-xl">
+                                <svg id="play-icon-custom" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                <svg id="pause-icon-custom" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            </button>
+                            <button onclick="spotifyPlayerAction('next', 'POST')" class="text-neutral-400 hover:text-white transition-colors p-1" title="Siguiente">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zm9-12v12h2V6z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barra de Progreso Única e Integrada -->
+                <div class="relative z-10 px-5 pb-5">
+                    <div class="flex justify-between text-[10px] text-neutral-500 mb-1.5 font-mono tracking-widest">
                         <span id="np-current-time">0:00</span>
                         <span id="np-duration">0:00</span>
                     </div>
-                    <div class="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                        <div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(29,185,84,0.4)]"></div>
+                    <div class="group/progress relative w-full bg-white/5 h-1 rounded-full overflow-hidden cursor-pointer">
+                        <div id="np-progress-bar" class="bg-[#1DB954] h-full w-0 transition-all duration-1000 ease-linear shadow-[0_0_12px_rgba(29,185,84,0.6)]"></div>
                     </div>
                 </div>
             </div>
