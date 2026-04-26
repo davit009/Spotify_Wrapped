@@ -14,11 +14,11 @@
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .tab-btn.active { color: #1DB954; border-bottom: 2px solid #1DB954; }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
     
-    <!-- NAVBAR (Igual a Dashboard para consistencia) -->
     <header class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center mb-10 gap-6">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
@@ -42,43 +42,51 @@
 
     <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-8">
         
-        <!-- Columna Izquierda: Gestión y Marcadores -->
         <div class="flex flex-col gap-6">
-            
             <!-- Marcadores Rápidos -->
             <div class="grid grid-cols-1 gap-4">
                 <div class="glass p-6 rounded-[2rem] relative overflow-hidden">
                     <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Líder del Día</h3>
-                    <div id="social-today-content" class="flex items-center gap-4">
-                        <p class="text-xs text-neutral-600 italic">Cargando competencia...</p>
-                    </div>
+                    <div id="social-today-content" class="flex items-center gap-4"><p class="text-xs text-neutral-600 italic">Cargando...</p></div>
                 </div>
                 <div class="glass p-6 rounded-[2rem] relative overflow-hidden">
                     <h3 class="text-[10px] font-black uppercase text-neutral-500 mb-4 tracking-widest">Líder de la Semana</h3>
-                    <div id="social-week-content" class="flex items-center gap-4">
-                        <p class="text-xs text-neutral-600 italic">Analizando duelos...</p>
-                    </div>
+                    <div id="social-week-content" class="flex items-center gap-4"><p class="text-xs text-neutral-600 italic">Cargando...</p></div>
                 </div>
             </div>
 
-            <!-- Buscador de Amigos Mejorado -->
+            <!-- TARJETA AMIGOS (CON PESTAÑAS INTERNAS) -->
             <div class="glass p-8 rounded-[2.5rem]">
-                <h3 class="text-xl font-black mb-6 italic">Buscar Amigos</h3>
-                <div class="relative mb-6">
-                    <input type="text" id="user-search-input" placeholder="Nombre de tu amigo..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-12 text-sm focus:outline-none focus:border-[#1DB954] transition-colors">
-                    <svg class="w-5 h-5 text-neutral-600 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black italic">Amigos</h3>
+                    <div class="flex gap-4">
+                        <button id="tab-btn-search" class="tab-btn active text-[10px] font-black uppercase tracking-widest pb-1 transition-all">Buscar</button>
+                        <button id="tab-btn-requests" class="tab-btn text-neutral-500 text-[10px] font-black uppercase tracking-widest pb-1 transition-all relative">
+                            Solicitudes
+                            <span id="request-badge" class="absolute -top-1 -right-2 w-2 h-2 bg-[#1DB954] rounded-full hidden"></span>
+                        </button>
+                    </div>
                 </div>
-                <div id="user-search-results" class="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                    <!-- Resultados -->
+
+                <!-- Contenedor Buscar -->
+                <div id="container-search" class="space-y-6">
+                    <div class="relative">
+                        <input type="text" id="user-search-input" placeholder="Nombre..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-12 text-sm focus:outline-none focus:border-[#1DB954]">
+                        <svg class="w-5 h-5 text-neutral-600 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <div id="user-search-results" class="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar"></div>
+                </div>
+
+                <!-- Contenedor Solicitudes -->
+                <div id="container-requests" class="hidden space-y-4 max-h-[350px] overflow-y-auto custom-scrollbar">
+                    <p class="text-center text-neutral-600 text-xs py-10">No tienes solicitudes pendientes.</p>
                 </div>
             </div>
 
             <!-- Mis Retos Activos -->
             <div class="glass p-8 rounded-[2.5rem]">
-                <h3 class="text-xl font-black mb-6 italic">Retos Activos</h3>
-                <div id="social-tab-active" class="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                    <!-- Retos -->
-                </div>
+                <h3 class="text-xl font-black mb-6 italic">Dúos Activos</h3>
+                <div id="social-tab-active" class="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2"></div>
             </div>
         </div>
 
@@ -90,15 +98,10 @@
                         <h2 class="text-3xl font-black italic">Historial en Común</h2>
                         <p class="text-[10px] text-neutral-500 uppercase font-black tracking-widest mt-1">Canciones que ambos escucharon hoy</p>
                     </div>
-                    <div class="bg-[#1DB954]/10 text-[#1DB954] p-3 rounded-2xl">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-                    </div>
                 </div>
-
                 <div id="common-tracks-list" class="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-                    <div class="flex flex-col items-center justify-center h-full text-neutral-600 italic">
+                    <div class="flex flex-col items-center justify-center h-full text-neutral-600 italic text-center">
                         <p>No hay coincidencias hoy todavía.</p>
-                        <p class="text-[10px] uppercase font-bold mt-2 tracking-tighter">¡Sigan escuchando para hacer match!</p>
                     </div>
                 </div>
             </div>
@@ -112,15 +115,12 @@
 
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (session) {
-                const userMeta = session.user.user_metadata;
-                document.getElementById('user-name').textContent = userMeta.full_name || 'Usuario';
-                if (userMeta.avatar_url) {
-                    const avatarImg = document.getElementById('user-avatar');
-                    avatarImg.src = userMeta.avatar_url;
-                    avatarImg.classList.remove('hidden');
+                document.getElementById('user-name').textContent = session.user.user_metadata.full_name || 'Usuario';
+                if (session.user.user_metadata.avatar_url) {
+                    const img = document.getElementById('user-avatar');
+                    img.src = session.user.user_metadata.avatar_url;
+                    img.classList.remove('hidden');
                 }
-                
-                // Iniciar lógica social
                 initSocial(session.user);
                 loadSocialPage(session.user.id);
             } else {
@@ -128,12 +128,30 @@
             }
         });
 
-        // Botón Invitación
+        // Lógica de Pestañas Internas (Buscar / Solicitudes)
+        const btnSearch = document.getElementById('tab-btn-search');
+        const btnReq = document.getElementById('tab-btn-requests');
+        const contSearch = document.getElementById('container-search');
+        const contReq = document.getElementById('container-requests');
+
+        btnSearch.addEventListener('click', () => {
+            btnSearch.classList.add('active');
+            btnReq.classList.remove('active');
+            contSearch.classList.remove('hidden');
+            contReq.classList.add('hidden');
+        });
+
+        btnReq.addEventListener('click', () => {
+            btnReq.classList.add('active');
+            btnSearch.classList.remove('active');
+            contReq.classList.remove('hidden');
+            contSearch.classList.add('hidden');
+            // Al entrar a solicitudes, podríamos quitar el badge si lo deseamos
+            document.getElementById('request-badge').classList.add('hidden');
+        });
+
         document.getElementById('invite-btn').addEventListener('click', () => {
-            const url = window.location.origin;
-            navigator.clipboard.writeText(url).then(() => {
-                alert("¡Enlace copiado! Envíalo a tus amigos para que se unan.");
-            });
+            navigator.clipboard.writeText(window.location.origin).then(() => alert("¡Enlace copiado!"));
         });
     </script>
 </body>
