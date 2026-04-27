@@ -61,7 +61,18 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'index.html';
     });
 
+    // Toggle dropdown
+    const menu = document.getElementById('profile-dropdown');
+    const toggleMenu = (e) => { 
+        e.stopPropagation(); 
+        menu.classList.toggle('active'); 
+    };
+    document.getElementById('profile-btn')?.addEventListener('click', toggleMenu);
+    document.getElementById('profile-btn-mobile')?.addEventListener('click', toggleMenu);
+    document.addEventListener('click', () => menu.classList.remove('active'));
+
     document.getElementById('settings-btn')?.addEventListener('click', () => {
+        menu.classList.remove('active'); // Cerrar dropdown al abrir ajustes
         settingsModal.classList.remove('hidden');
         setTimeout(() => {
             settingsModalContent.classList.remove('scale-95', 'opacity-0');
@@ -87,6 +98,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (redirectTimeout) clearTimeout(redirectTimeout);
             if (dataInitialized) return;
             dataInitialized = true;
+
+            // Poblar UI de usuario
+            const user = session.user;
+            const nameEl = document.getElementById('user-name');
+            const avatarEl = document.getElementById('user-avatar');
+            const avatarMobileEl = document.getElementById('user-avatar-mobile');
+            if (nameEl) nameEl.textContent = user.user_metadata.display_name || user.email.split('@')[0];
+            const avatarUrl = user.user_metadata.avatar_url || '';
+            if (avatarEl) avatarEl.src = avatarUrl;
+            if (avatarMobileEl) avatarMobileEl.src = avatarUrl;
 
             // Toggle fusionar historial
             document.getElementById('toggle-history')?.addEventListener('change', async (e) => {

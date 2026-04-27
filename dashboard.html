@@ -251,7 +251,13 @@
         }
 
         bootstrap();
-        document.getElementById('profile-btn')?.addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('profile-dropdown').classList.toggle('active'); });
+        const toggleMenu = (e) => { 
+            e.stopPropagation(); 
+            document.getElementById('profile-dropdown').classList.toggle('active'); 
+        };
+        document.getElementById('profile-btn')?.addEventListener('click', toggleMenu);
+        document.getElementById('profile-btn-mobile')?.addEventListener('click', toggleMenu);
+        
         document.addEventListener('click', () => document.getElementById('profile-dropdown').classList.remove('active'));
         document.getElementById('logout-btn')?.addEventListener('click', () => supabaseClient.auth.signOut());
         document.getElementById('close-list-modal').addEventListener('click', () => document.getElementById('list-modal').classList.add('hidden'));
