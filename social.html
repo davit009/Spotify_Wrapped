@@ -33,24 +33,24 @@
     
     <div id="album-bg"></div>
 
-    <header class="w-full max-w-6xl flex items-center justify-between mb-12 gap-4 relative z-10">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.4)]">
-                <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <header class="w-full max-w-6xl flex items-center justify-between mb-8 sm:mb-12 gap-2 sm:gap-4 relative z-10">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.4)]">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
             </div>
-            <h1 class="text-xl font-black tracking-tighter">Estadísticas</h1>
+            <h1 class="text-sm sm:text-xl font-black tracking-tighter">Estadísticas</h1>
         </div>
 
-        <nav class="flex items-center gap-4 bg-white/5 px-6 py-2.5 rounded-full border border-white/10">
-            <a href="dashboard.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Música</a>
-            <a href="social.html" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Social</a>
-            <a href="profile.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Historial</a>
+        <nav class="flex items-center gap-2 sm:gap-4 bg-white/5 px-3 sm:px-6 py-2 rounded-full border border-white/10">
+            <a href="dashboard.html" class="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Música</a>
+            <a href="social.html" class="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Social</a>
+            <a href="profile.html" class="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">Historial</a>
         </nav>
 
         <div class="relative">
-            <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10">
-                <img id="user-avatar" src="" class="w-8 h-8 rounded-full bg-neutral-800 object-cover">
-                <span id="user-name" class="text-xs font-bold truncate max-w-[80px]">...</span>
+            <button id="profile-btn" class="flex items-center gap-2 sm:gap-3 bg-white/5 p-1 sm:pr-4 rounded-full border border-white/10">
+                <img id="user-avatar" src="" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-800 object-cover">
+                <span id="user-name" class="hidden sm:inline text-xs font-bold truncate max-w-[80px]">...</span>
             </button>
             <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
                 <button id="open-friends-btn" class="w-full text-left px-4 py-2.5 hover:bg-white/5 text-white font-bold text-xs rounded-xl mb-1">Gestionar Amigos</button>
@@ -63,9 +63,9 @@
         <!-- FILTROS CENTRADOS -->
         <div class="flex flex-col items-center gap-6">
             <div class="flex gap-1 bg-white/5 p-1 rounded-full border border-white/10">
-                <button id="filter-today" class="px-6 py-2 text-[9px] font-black uppercase rounded-full bg-[#1DB954] text-black">Hoy</button>
-                <button id="filter-week" class="px-6 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Semanal</button>
-                <button id="filter-month" class="px-6 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Mensual</button>
+                <button id="filter-today" class="px-4 sm:px-6 py-2 text-[9px] font-black uppercase rounded-full bg-[#1DB954] text-black">Hoy</button>
+                <button id="filter-week" class="px-4 sm:px-6 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Semanal</button>
+                <button id="filter-month" class="px-4 sm:px-6 py-2 text-[9px] font-black uppercase rounded-full text-neutral-500 hover:text-white">Mensual</button>
             </div>
         </div>
         

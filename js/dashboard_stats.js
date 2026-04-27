@@ -3,6 +3,7 @@ import { getValidToken } from './token_manager.js';
 
 let dailyTracks = [];
 let weeklyTracks = [];
+let currentFilter = 'total';
 
 export async function initDashboard(session) {
     const userId = session.user.id;
@@ -11,15 +12,32 @@ export async function initDashboard(session) {
         loadTops(userId, session),
         loadRecentHistory(userId, session)
     ]);
-    setupClickHandlers();
+    setupClickHandlers(userId);
 }
 
 async function loadTotalTime(userId) {
     const { data: user } = await supabaseClient.from('users').select('historical_stats, preferences').eq('id', userId).single();
-    const { data: realtime } = await supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId);
+    
+    let query = supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId);
+    
+    const now = new Date();
+    if (currentFilter === 'today') {
+        now.setHours(0,0,0,0);
+        query = query.gte('played_at', now.toISOString());
+    } else if (currentFilter === 'week') {
+        now.setDate(now.getDate() - 7);
+        query = query.gte('played_at', now.toISOString());
+    } else if (currentFilter === 'month') {
+        now.setDate(now.getDate() - 30);
+        query = query.gte('played_at', now.toISOString());
+    }
+
+    const { data: realtime } = await query;
     
     let totalMs = (realtime || []).reduce((acc, s) => acc + s.duration_ms, 0);
-    if (user?.preferences?.merge_history && user?.historical_stats) {
+    
+    // Solo sumamos el historial histórico si el filtro es 'total'
+    if (currentFilter === 'total' && user?.preferences?.merge_history && user?.historical_stats) {
         totalMs += user.historical_stats.totalMsPlayed || 0;
     }
     
@@ -27,6 +45,12 @@ async function loadTotalTime(userId) {
     const minutes = Math.floor((totalMs % 3600000) / 60000);
     const el = document.getElementById('stats-total-hours');
     if (el) el.innerHTML = `${hours}<span class="text-xl text-white/50 ml-1 not-italic">h</span> ${minutes}<span class="text-xl text-white/50 ml-1 not-italic">m</span>`;
+    
+    const titleEl = document.getElementById('stats-title');
+    if (titleEl) {
+        const titles = { today: 'Tiempo Hoy', week: 'Tiempo Semanal', month: 'Tiempo Mensual', total: 'Tiempo Total' };
+        titleEl.textContent = titles[currentFilter];
+    }
 }
 
 async function loadTops(userId, session) {
@@ -89,7 +113,30 @@ function renderTopCard(elementId, track) {
     el.appendChild(content);
 }
 
-function setupClickHandlers() {
+function setupClickHandlers(userId) {
+    const periods = ['today', 'week', 'month', 'total'];
+    periods.forEach(p => {
+        const btn = document.getElementById(`filter-${p}`);
+        if (btn) {
+            btn.onclick = () => {
+                currentFilter = p;
+                loadTotalTime(userId);
+                
+                // Actualizar UI de botones
+                periods.forEach(id => {
+                    const b = document.getElementById(`filter-${id}`);
+                    if (id === currentFilter) {
+                        b.classList.add('bg-[#1DB954]', 'text-black');
+                        b.classList.remove('text-neutral-500');
+                    } else {
+                        b.classList.remove('bg-[#1DB954]', 'text-black');
+                        b.classList.add('text-neutral-500');
+                    }
+                });
+            };
+        }
+    });
+
     document.getElementById('card-top-today')?.addEventListener('click', () => showListModal("Top de Hoy", dailyTracks));
     document.getElementById('card-top-week')?.addEventListener('click', () => showListModal("Top Semanal", weeklyTracks));
 }

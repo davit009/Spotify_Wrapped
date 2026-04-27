@@ -48,14 +48,14 @@ export async function initSocial(currentUser) {
 function formatTime(ms) {
     const hours = Math.floor(ms / 3600000);
     const minutes = Math.floor((ms % 3600000) / 60000);
-    return `${hours}<span class="text-[12px] opacity-60 ml-0.5 not-italic font-bold">h</span> ${minutes}<span class="text-[12px] opacity-60 ml-0.5 not-italic font-bold">m</span>`;
+    return `${hours}<span class="text-[10px] text-white/60 ml-0.5 not-italic font-black uppercase tracking-tighter">h</span> ${minutes}<span class="text-[10px] text-white/60 ml-0.5 not-italic font-black uppercase tracking-tighter">m</span>`;
 }
 
 function getAvatarHTML(url, name, sizeClass = "w-20 h-20", isRobot = false) {
-    if (isRobot) return `<div class="${sizeClass} rounded-full bg-white/5 flex items-center justify-center text-4xl border border-white/10 shadow-xl">🤖</div>`;
+    if (isRobot) return `<div class="${sizeClass} rounded-full bg-white/5 flex items-center justify-center text-2xl sm:text-4xl border border-white/10 shadow-xl">🤖</div>`;
     if (url && url.trim() !== '') return `<img src="${url}" class="${sizeClass} rounded-full border border-white/20 shadow-2xl object-cover">`;
     const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
-    return `<div class="${sizeClass} rounded-full avatar-fallback text-sm tracking-widest border border-white/10">${initials}</div>`;
+    return `<div class="${sizeClass} rounded-full avatar-fallback text-[10px] sm:text-sm tracking-widest border border-white/10">${initials}</div>`;
 }
 
 function switchTab(tabName, userId) {
@@ -106,7 +106,7 @@ async function renderArena(userId) {
     if (!container) return;
 
     if (activeChallenges.length === 0) {
-        container.innerHTML = `<div class="glass p-20 rounded-[3rem] w-full text-center"><p class="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">Sin comparativas activas</p></div>`;
+        container.innerHTML = `<div class="glass p-12 sm:p-20 rounded-[3rem] w-full text-center"><p class="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">Sin comparativas activas</p></div>`;
         return;
     }
 
@@ -135,37 +135,37 @@ async function renderArena(userId) {
         winHistoryHTML = `<div class="w-full max-w-xs flex gap-2 h-1 mb-10">${historyLines}</div>`;
     }
 
-    const userAvatar = getAvatarHTML(currentUserData?.user_metadata?.avatar_url, "Tú", "w-24 h-24");
-    const friendAvatar = getAvatarHTML(otherUser.avatar_url, otherUser.display_name, "w-24 h-24", otherUser.display_name.toUpperCase().includes('ROBOT'));
+    const userAvatar = getAvatarHTML(currentUserData?.user_metadata?.avatar_url, "Tú", "w-16 h-16 sm:w-24 sm:h-24");
+    const friendAvatar = getAvatarHTML(otherUser.avatar_url, otherUser.display_name, "w-16 h-16 sm:w-24 sm:h-24", otherUser.display_name.toUpperCase().includes('ROBOT'));
 
     container.innerHTML = `
-        <div class="glass w-full rounded-[4rem] p-12 sm:p-20 relative overflow-hidden flex flex-col items-center">
-            <div class="flex items-center justify-center gap-12 sm:gap-24 mb-16 w-full">
-                <div class="flex flex-col items-center gap-6 flex-1">
-                    <div class="relative">${userAvatar}</div>
-                    <div class="text-center">
-                        <p class="text-[10px] font-black uppercase text-[#1DB954] tracking-[0.3em] mb-2">Tú</p>
-                        <p class="text-4xl font-black italic tracking-tighter text-gradient">${formatTime(myTime)}</p>
+        <div class="glass w-full rounded-[3rem] sm:rounded-[4rem] p-8 sm:p-20 relative overflow-hidden flex flex-col items-center">
+            <div class="flex items-center justify-center gap-6 sm:gap-24 mb-10 sm:mb-16 w-full">
+                <div class="flex flex-col items-center gap-4 sm:gap-6 flex-1 min-w-0">
+                    <div class="relative shrink-0">${userAvatar}</div>
+                    <div class="text-center w-full">
+                        <p class="text-[8px] sm:text-[10px] font-black uppercase text-[#1DB954] tracking-[0.2em] sm:tracking-[0.3em] mb-1 sm:mb-2">Tú</p>
+                        <p class="text-xl sm:text-4xl font-black italic tracking-tighter text-gradient truncate">${formatTime(myTime)}</p>
                     </div>
                 </div>
 
-                <div class="text-[10px] font-black text-white/5 uppercase tracking-[0.5em] mt-4">vs</div>
+                <div class="text-[8px] sm:text-[10px] font-black text-white/10 uppercase tracking-[0.3em] sm:tracking-[0.5em] mt-4 shrink-0">vs</div>
 
-                <div class="flex flex-col items-center gap-6 flex-1">
-                    <div class="relative">${friendAvatar}</div>
-                    <div class="text-center">
-                        <p class="text-[10px] font-black uppercase text-neutral-500 tracking-[0.3em] mb-2">${otherUser.display_name.split(' ')[0]}</p>
-                        <p class="text-4xl font-black italic tracking-tighter">${formatTime(friendTime)}</p>
+                <div class="flex flex-col items-center gap-4 sm:gap-6 flex-1 min-w-0">
+                    <div class="relative shrink-0">${friendAvatar}</div>
+                    <div class="text-center w-full">
+                        <p class="text-[8px] sm:text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em] sm:tracking-[0.3em] mb-1 sm:mb-2">${otherUser.display_name.split(' ')[0]}</p>
+                        <p class="text-xl sm:text-4xl font-black italic tracking-tighter truncate">${formatTime(friendTime)}</p>
                     </div>
                 </div>
             </div>
 
-            <div class="w-full max-w-lg mb-12">
-                <div class="h-2 bg-white/5 rounded-full flex overflow-hidden p-0.5">
+            <div class="w-full max-w-lg mb-8 sm:mb-12">
+                <div class="h-1.5 sm:h-2 bg-white/5 rounded-full flex overflow-hidden p-0.5">
                     <div class="h-full bg-[#1DB954] transition-all duration-1000 shadow-[0_0_15px_rgba(29,185,84,0.4)]" style="width: ${myPercent}%"></div>
                     <div class="h-full bg-white/5 transition-all duration-1000" style="width: ${friendPercent}%"></div>
                 </div>
-                <div class="flex justify-between px-2 mt-4 text-[9px] font-black text-neutral-600 uppercase tracking-widest">
+                <div class="flex justify-between px-2 mt-3 sm:mt-4 text-[8px] sm:text-[9px] font-black text-neutral-600 uppercase tracking-widest">
                     <span>${Math.round(myPercent)}%</span>
                     <span>${Math.round(friendPercent)}%</span>
                 </div>
@@ -173,8 +173,8 @@ async function renderArena(userId) {
 
             ${winHistoryHTML}
             
-            <div class="py-4 px-12 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-md">
-                <p class="text-center text-[10px] font-black uppercase tracking-[0.5em] text-neutral-400 italic">
+            <div class="py-3 px-8 sm:py-4 sm:px-12 bg-white/[0.03] rounded-2xl sm:rounded-3xl border border-white/5 backdrop-blur-md">
+                <p class="text-center text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-neutral-400 italic">
                     ${myTime >= friendTime ? 'Vas arriba' : 'Vas abajo'}
                 </p>
             </div>
