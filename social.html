@@ -160,10 +160,26 @@
                 });
                 if (res.status === 200) {
                     const data = await res.json();
-                    const imgUrl = data.item.album.images[0].url;
-                    const bg = document.getElementById('album-bg');
-                    bg.style.backgroundImage = `url(${imgUrl})`;
-                    bg.classList.add('visible');
+                    if (data && data.item) {
+                        const imgUrl = data.item.album.images[0].url;
+                        const bg = document.getElementById('album-bg');
+                        bg.style.backgroundImage = `url(${imgUrl})`;
+                        bg.classList.add('visible');
+                    }
+                } else if (res.status === 204) {
+                    // Si no hay nada sonando, buscar la última
+                    const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=1', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (recentRes.ok) {
+                        const recentData = await recentRes.json();
+                        if (recentData.items && recentData.items.length > 0) {
+                            const imgUrl = recentData.items[0].track.album.images[0].url;
+                            const bg = document.getElementById('album-bg');
+                            bg.style.backgroundImage = `url(${imgUrl})`;
+                            bg.classList.add('visible');
+                        }
+                    }
                 }
             } catch (e) {}
         }

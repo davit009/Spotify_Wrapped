@@ -15,6 +15,17 @@ export async function checkCurrentlyPlaying(session) {
         const npCard = document.getElementById('now-playing-card');
         if (response.status === 204 || response.status > 400) {
             if (npCard) npCard.classList.add('hidden');
+            
+            // Si no hay nada sonando, intentar poner el fondo de la última canción escuchada
+            const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=1', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (recentRes.ok) {
+                const recentData = await recentRes.json();
+                if (recentData.items && recentData.items.length > 0) {
+                    updateDynamicBackground(recentData.items[0].track.album.images[0].url);
+                }
+            }
             return;
         }
 
