@@ -43,6 +43,64 @@ export async function initSocial(currentUser) {
             }, 400);
         });
     }
+
+    // Botón de copiar link de invitación
+    document.getElementById('copy-invite-btn')?.addEventListener('click', () => {
+        const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${currentUser.id}`;
+        navigator.clipboard.writeText(inviteUrl).then(() => {
+            const btn = document.getElementById('copy-invite-btn');
+            const originalInner = btn.innerHTML;
+            btn.innerHTML = '<span class="text-[8px]">¡COPIADO!</span>';
+            setTimeout(() => btn.innerHTML = originalInner, 2000);
+        });
+    });
+
+    // Manejar invitación entrante
+    handleIncomingInvite(currentUser.id);
+}
+
+async function handleIncomingInvite(currentUserId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviterId = urlParams.get('invite');
+
+    if (inviterId && inviterId !== currentUserId) {
+        try {
+            // Verificar si ya existe una relación
+            const { data: existing } = await supabaseClient
+                .from('challenges')
+                .select('id')
+                .or(`and(creator_id.eq.${inviterId},opponent_id.eq.${currentUserId}),and(creator_id.eq.${currentUserId},opponent_id.eq.${inviterId})`)
+                .neq('status', 'finished');
+
+            if (existing && existing.length > 0) {
+                console.log('Ya existe una relación activa o pendiente.');
+            } else {
+                // Crear relación automática
+                const start = new Date();
+                const end = new Date();
+                end.setFullYear(end.getFullYear() + 1);
+
+                const { error } = await supabaseClient.from('challenges').insert({
+                    creator_id: inviterId,
+                    opponent_id: currentUserId,
+                    start_date: start.toISOString(),
+                    end_date: end.toISOString(),
+                    status: 'active' // Lo ponemos directo como activo según la petición
+                });
+
+                if (!error) {
+                    alert("¡Nuevo amigo añadido correctamente!");
+                    // Recargar para ver los cambios
+                    window.location.href = window.location.pathname;
+                }
+            }
+            
+            // Limpiar la URL sin recargar (opcional, pero ayuda a no repetir el proceso)
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) {
+            console.error('Error al procesar invitación:', e);
+        }
+    }
 }
 
 function formatTime(ms) {
