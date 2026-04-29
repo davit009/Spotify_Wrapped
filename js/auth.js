@@ -1,3 +1,5 @@
+import { supabaseClient } from './supabase.js';
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Verificar si ya estamos logueados
     const { data: { session } } = await supabaseClient.auth.getSession();
