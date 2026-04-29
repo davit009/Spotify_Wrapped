@@ -38,7 +38,7 @@ export async function initSocial(currentUser) {
             const query = e.target.value.trim();
             if (query.length < 2) return;
             timeout = setTimeout(async () => {
-                const { data } = await supabaseClient.from('users').select('*').ilike('display_name', `%${query}%`).neq('id', currentUser.id).limit(5);
+                const { data } = await supabaseClient.from('users_public').select('id, display_name, avatar_url').ilike('display_name', `%${query}%`).neq('id', currentUser.id).limit(5);
                 renderSearchResults(data, currentUser.id);
             }, 400);
         });
