@@ -10,6 +10,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    // Show login UI
+    const loginCard = document.getElementById('login-card');
+    if (loginCard) {
+        loginCard.style.display = 'flex'; // `.card` uses flex in CSS typically
+    }
+
     // 2. Botón de Login
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {

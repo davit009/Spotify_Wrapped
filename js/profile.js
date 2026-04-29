@@ -1,4 +1,5 @@
 import { supabaseClient } from './supabase.js';
+import { getValidToken } from './token_manager.js';
 
 // ============================================================
 // CACHÉ DE IMÁGENES (localStorage, TTL 24h)
@@ -108,6 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const avatarUrl = user.user_metadata.avatar_url || '';
             if (avatarEl) avatarEl.src = avatarUrl;
             if (avatarMobileEl) avatarMobileEl.src = avatarUrl;
+
+            // Fondo dinámico
+            updateBackground(user.id);
+            setInterval(() => updateBackground(user.id), 10000);
 
             // Toggle fusionar historial
             document.getElementById('toggle-history')?.addEventListener('change', async (e) => {
@@ -552,3 +557,42 @@ window.togglePlay = function(url, el) {
     currentPlayingBtn = icon;
     currentAudio.onended = () => { icon.textContent = '▶'; };
 };
+
+// ============================================================
+// FONDO DINÁMICO
+// ============================================================
+async function updateBackground(userId) {
+    const token = await getValidToken(userId);
+    if (!token) return;
+    try {
+        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 200) {
+            const data = await res.json();
+            if (data && data.item && data.item.album && data.item.album.images.length > 0) {
+                const imgUrl = data.item.album.images[0].url;
+                const bg = document.getElementById('album-bg');
+                if (bg) {
+                    bg.style.backgroundImage = `url(${imgUrl})`;
+                    bg.classList.add('visible');
+                }
+            }
+        } else if (res.status === 204) {
+            const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=1', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (recentRes.ok) {
+                const recentData = await recentRes.json();
+                if (recentData.items && recentData.items.length > 0) {
+                    const imgUrl = recentData.items[0].track.album.images[0].url;
+                    const bg = document.getElementById('album-bg');
+                    if (bg) {
+                        bg.style.backgroundImage = `url(${imgUrl})`;
+                        bg.classList.add('visible');
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+}
