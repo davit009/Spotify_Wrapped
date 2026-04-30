@@ -1,69 +1,147 @@
 import { supabaseClient } from './supabase.js';
 
+// ── Helpers de navegación entre estados ──────────────────────────────────────
+function goToState(id) {
+    document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+}
+
+function showLoginCard() {
+    const card = document.getElementById('login-card');
+    if (card) card.classList.add('visible');
+}
+
+function showError(msg) {
+    const el = document.getElementById('form-error');
+    if (el) { el.textContent = msg; el.classList.add('visible'); }
+}
+
+function hideError() {
+    const el = document.getElementById('form-error');
+    if (el) el.classList.remove('visible');
+}
+
+// ── Flujo OAuth directo (para usuarios ya aprobados) ─────────────────────────
+async function doSpotifyLogin() {
+    if (!supabaseClient) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const invite = urlParams.get('invite');
+    const redirectTo = invite
+        ? `${window.location.origin}/social.html?invite=${invite}`
+        : window.location.origin;
+
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'spotify',
+        options: {
+            scopes: 'user-read-currently-playing user-modify-playback-state user-read-playback-state user-read-recently-played user-read-email user-read-private',
+            redirectTo: redirectTo
+        }
+    });
+
+    if (error) {
+        console.error('Error OAuth:', error.message);
+        alert('Hubo un error al conectar con Spotify: ' + error.message);
+    }
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-    // Guard: si supabaseClient no se pudo inicializar
+
+    // Guard: Supabase disponible
     if (!supabaseClient) {
-        console.error('Supabase client no disponible. Revisa que el CDN esté cargado.');
+        console.error('Supabase client no disponible.');
         showLoginCard();
         return;
     }
 
-    // 1. Verificar si ya estamos logueados
-    let session = null;
+    // 1. Verificar si ya hay sesión activa → redirigir al dashboard
     try {
         const { data } = await supabaseClient.auth.getSession();
-        session = data.session;
+        if (data.session) {
+            window.location.href = 'dashboard.html';
+            return;
+        }
     } catch (e) {
         console.error('Error al verificar sesión:', e);
     }
 
-    // Si hay sesión activa, redirigir al dashboard
-    if (session) {
-        window.location.href = 'dashboard.html';
-        return;
-    }
-
-    // Mostrar la UI de login
+    // 2. Mostrar la card
     showLoginCard();
 
-    // 2. Botón de Login con Spotify
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', async () => {
-            // Deshabilitar botón para evitar doble click
-            loginBtn.disabled = true;
-            loginBtn.style.opacity = '0.7';
-            loginBtn.textContent = 'Conectando...';
+    // ── Botón "Solicitar acceso anticipado" → ir al formulario ──
+    document.getElementById('btn-request-access')?.addEventListener('click', () => {
+        goToState('state-form');
+    });
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const invite = urlParams.get('invite');
-            const redirectTo = invite
-                ? `${window.location.origin}/social.html?invite=${invite}`
-                : window.location.origin;
+    // ── Botón "Volver" → regresar al home ──
+    document.getElementById('btn-back-home')?.addEventListener('click', () => {
+        hideError();
+        goToState('state-home');
+    });
 
-            const { error } = await supabaseClient.auth.signInWithOAuth({
-                provider: 'spotify',
-                options: {
-                    scopes: 'user-read-currently-playing user-modify-playback-state user-read-playback-state user-read-recently-played user-read-email user-read-private',
-                    redirectTo: redirectTo
-                }
-            });
+    // ── Links "Ya tengo acceso" → login directo con Spotify ──
+    document.getElementById('btn-already-access')?.addEventListener('click', doSpotifyLogin);
+    document.getElementById('btn-already-access-2')?.addEventListener('click', doSpotifyLogin);
+
+    // ── Formulario de lista de espera ──
+    document.getElementById('btn-submit-waitlist')?.addEventListener('click', async () => {
+        hideError();
+
+        const nameEl  = document.getElementById('input-name');
+        const emailEl = document.getElementById('input-email');
+        const btn     = document.getElementById('btn-submit-waitlist');
+
+        const name  = nameEl.value.trim();
+        const email = emailEl.value.trim().toLowerCase();
+
+        // Validación
+        if (!name) {
+            showError('Por favor ingresa tu nombre.');
+            nameEl.focus();
+            return;
+        }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showError('Ingresa un email válido de tu cuenta Spotify.');
+            emailEl.focus();
+            return;
+        }
+
+        // Deshabilitar botón
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+
+        try {
+            const { error } = await supabaseClient
+                .from('waitlist')
+                .insert({ name, spotify_email: email });
 
             if (error) {
-                console.error('Error en el login:', error.message);
-                alert('Hubo un error al conectar con Spotify: ' + error.message);
-                // Restaurar botón si hay error
-                loginBtn.disabled = false;
-                loginBtn.style.opacity = '1';
-                loginBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg> Entrar con Spotify`;
+                console.error('Error al guardar en waitlist:', error);
+                showError('Ocurrió un error. Intenta de nuevo en un momento.');
+                btn.disabled = false;
+                btn.textContent = 'Unirme a la lista de espera';
+                return;
+            }
+
+            // Éxito → pasar al estado de espera
+            goToState('state-waiting');
+
+        } catch (e) {
+            console.error('Error inesperado:', e);
+            showError('Ocurrió un error inesperado. Intenta de nuevo.');
+            btn.disabled = false;
+            btn.textContent = 'Unirme a la lista de espera';
+        }
+    });
+
+    // ── Soporte para Enter en los inputs ──
+    ['input-name', 'input-email'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btn-submit-waitlist')?.click();
             }
         });
-    }
+    });
 });
-
-function showLoginCard() {
-    const loginCard = document.getElementById('login-card');
-    if (loginCard) {
-        loginCard.classList.add('visible');
-    }
-}

@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playcount - Rastrea tu música</title>
+    <meta name="description" content="Descubre cuántas horas de tu vida has vivido con música. Rastreo en tiempo real con historial completo.">
     <link rel="icon" type="image/png" href="assets/favicon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
             font-family: 'Inter', sans-serif;
             background: #080808;
@@ -19,7 +21,8 @@
             justify-content: center;
             overflow: hidden;
         }
-        /* Orbs animados de fondo */
+
+        /* ── Orbs animados ── */
         .orb {
             position: fixed;
             border-radius: 50%;
@@ -37,11 +40,11 @@
             66%       { transform: translate(-30px, 30px); }
         }
 
-        /* Tarjeta principal */
+        /* ── Tarjeta principal ── */
         .card {
             position: relative;
             z-index: 10;
-            background: rgba(18, 18, 18, 0.75);
+            background: rgba(18, 18, 18, 0.80);
             backdrop-filter: blur(48px);
             -webkit-backdrop-filter: blur(48px);
             border: 1px solid rgba(255,255,255,0.07);
@@ -52,7 +55,10 @@
             text-align: center;
             box-shadow: 0 0 100px rgba(29,185,84,0.07), 0 50px 100px rgba(0,0,0,0.6);
             animation: cardIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+            display: none;
         }
+        .card.visible { display: block; }
+
         @keyframes cardIn {
             from { opacity: 0; transform: translateY(24px) scale(0.97); }
             to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -73,11 +79,12 @@
             pointer-events: none;
         }
 
+        /* ── Logo y tagline ── */
         .logo { font-size: 2.6rem; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 6px; }
         .logo span { color: #1DB954; }
         .tagline { color: rgba(255,255,255,0.45); font-size: 0.88rem; line-height: 1.65; margin-bottom: 36px; }
 
-        /* Features */
+        /* ── Features ── */
         .features { margin-bottom: 36px; text-align: left; }
         .feat {
             display: flex;
@@ -87,21 +94,12 @@
             border-bottom: 1px solid rgba(255,255,255,0.05);
             font-size: 0.83rem;
             color: rgba(255,255,255,0.55);
-            animation: featIn 0.5s ease both;
         }
         .feat:last-child { border-bottom: none; }
-        .feat:nth-child(1) { animation-delay: 0.15s; }
-        .feat:nth-child(2) { animation-delay: 0.25s; }
-        .feat:nth-child(3) { animation-delay: 0.35s; }
-        .feat:nth-child(4) { animation-delay: 0.45s; }
-        @keyframes featIn {
-            from { opacity: 0; transform: translateX(-8px); }
-            to   { opacity: 1; transform: translateX(0); }
-        }
         .feat-dot { width: 7px; height: 7px; background: #1DB954; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 8px rgba(29,185,84,0.6); }
 
-        /* Botón login */
-        #login-btn {
+        /* ── Botón principal ── */
+        .btn-spotify {
             width: 100%;
             display: flex;
             align-items: center;
@@ -117,15 +115,160 @@
             cursor: pointer;
             transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
             letter-spacing: 0.2px;
+            font-family: 'Inter', sans-serif;
         }
-        #login-btn:hover  { background: #1ed760; transform: scale(1.025); box-shadow: 0 10px 35px rgba(29,185,84,0.45); }
-        #login-btn:active { transform: scale(0.97); }
+        .btn-spotify:hover  { background: #1ed760; transform: scale(1.025); box-shadow: 0 10px 35px rgba(29,185,84,0.45); }
+        .btn-spotify:active { transform: scale(0.97); }
+        .btn-spotify:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
         .footer-note { margin-top: 18px; font-size: 0.68rem; color: rgba(255,255,255,0.2); }
 
-        /* La tarjeta se oculta inicialmente hasta verificar sesión */
-        .card { display: none; }
-        .card.visible { display: flex; flex-direction: column; }
+        /* ── Link "ya tengo acceso" ── */
+        .already-link {
+            margin-top: 14px;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.25);
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: color 0.2s;
+            background: none;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            display: inline-block;
+        }
+        .already-link:hover { color: rgba(255,255,255,0.55); }
+
+        /* ── ESTADOS de la card ── */
+        .state { display: none; animation: fadeSlide 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+        .state.active { display: block; }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Estado: Formulario ── */
+        .form-header { margin-bottom: 28px; }
+        .form-header h2 { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 8px; }
+        .form-header p { font-size: 0.83rem; color: rgba(255,255,255,0.45); line-height: 1.6; }
+
+        .form-group { margin-bottom: 16px; text-align: left; }
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: white;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .form-group input:focus {
+            border-color: rgba(29,185,84,0.5);
+            background: rgba(29,185,84,0.05);
+        }
+        .form-group input::placeholder { color: rgba(255,255,255,0.2); }
+
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background: #1DB954;
+            color: #000;
+            font-weight: 800;
+            font-size: 0.95rem;
+            border: none;
+            border-radius: 100px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            margin-top: 8px;
+        }
+        .btn-submit:hover { background: #1ed760; transform: scale(1.02); box-shadow: 0 8px 28px rgba(29,185,84,0.4); }
+        .btn-submit:active { transform: scale(0.97); }
+        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .btn-back {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.3);
+            font-size: 0.78rem;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            margin-top: 14px;
+            transition: color 0.2s;
+        }
+        .btn-back:hover { color: rgba(255,255,255,0.6); }
+
+        .error-msg {
+            background: rgba(255, 80, 80, 0.1);
+            border: 1px solid rgba(255, 80, 80, 0.2);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            color: #ff8080;
+            margin-bottom: 14px;
+            display: none;
+            text-align: left;
+        }
+        .error-msg.visible { display: block; }
+
+        /* ── Estado: Lista de espera ── */
+        .waiting-icon {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, rgba(29,185,84,0.15), rgba(29,185,84,0.05));
+            border: 1px solid rgba(29,185,84,0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(29,185,84,0.3); }
+            50%       { box-shadow: 0 0 0 14px rgba(29,185,84,0); }
+        }
+        .waiting-icon svg { color: #1DB954; }
+
+        .waiting-title { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 10px; }
+        .waiting-sub { font-size: 0.85rem; color: rgba(255,255,255,0.45); line-height: 1.7; margin-bottom: 28px; }
+        .waiting-sub strong { color: #1DB954; }
+
+        .waiting-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(29,185,84,0.08);
+            border: 1px solid rgba(29,185,84,0.2);
+            border-radius: 100px;
+            padding: 10px 20px;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 10px;
+        }
+        .badge-dot { width: 6px; height: 6px; background: #1DB954; border-radius: 50%; animation: blink 1.5s ease-in-out infinite; }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+
+        /* Mobile */
+        @media (max-width: 480px) {
+            .card { padding: 36px 24px; margin: 16px; }
+            .logo { font-size: 2.1rem; }
+        }
     </style>
 </head>
 <body>
@@ -134,23 +277,88 @@
     <div class="orb orb-3"></div>
 
     <div class="card" id="login-card">
-        <div class="logo">Play<span>count</span></div>
-        <p class="tagline">Descubre cuántas horas de tu vida has vivido con música.<br>En tiempo real y con historial completo.</p>
 
-        <div class="features">
-            <div class="feat"><div class="feat-dot"></div>Rastreo automático mientras escuchas</div>
-            <div class="feat"><div class="feat-dot"></div>Historial de vida importado desde Spotify</div>
-            <div class="feat"><div class="feat-dot"></div>Top artistas y canciones filtrados por año</div>
-            <div class="feat"><div class="feat-dot"></div>Todo guardado en la nube, siempre disponible</div>
+        <!-- ════════════════════════════════════
+             ESTADO 1: Home (pantalla principal)
+             ════════════════════════════════════ -->
+        <div class="state active" id="state-home">
+            <div class="logo">Play<span>count</span></div>
+            <p class="tagline">Descubre cuántas horas de tu vida has vivido con música.<br>En tiempo real y con historial completo.</p>
+
+            <div class="features">
+                <div class="feat"><div class="feat-dot"></div>Rastreo automático mientras escuchas</div>
+                <div class="feat"><div class="feat-dot"></div>Historial de vida importado desde Spotify</div>
+                <div class="feat"><div class="feat-dot"></div>Top artistas y canciones filtrados por año</div>
+                <div class="feat"><div class="feat-dot"></div>Todo guardado en la nube, siempre disponible</div>
+            </div>
+
+            <button class="btn-spotify" id="btn-request-access">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                </svg>
+                Solicitar acceso anticipado
+            </button>
+
+            <p class="footer-note" style="margin-top:10px;">
+                ¿Ya tienes acceso?
+                <button class="already-link" id="btn-already-access">Iniciar sesión →</button>
+            </p>
         </div>
 
-        <button id="login-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-            </svg>
-            Entrar con Spotify
-        </button>
-        <p class="footer-note">Al continuar aceptas el rastreo pasivo de tu actividad musical.</p>
+        <!-- ════════════════════════════════════
+             ESTADO 2: Formulario de lista de espera
+             ════════════════════════════════════ -->
+        <div class="state" id="state-form">
+            <div class="form-header">
+                <div class="logo" style="font-size:2rem; margin-bottom:10px;">Play<span style="color:#1DB954">count</span></div>
+                <h2>Solicitar acceso</h2>
+                <p>Estamos en beta cerrado. Deja tus datos y te avisamos cuando tu acceso esté listo.</p>
+            </div>
+
+            <div class="error-msg" id="form-error"></div>
+
+            <div class="form-group">
+                <label for="input-name">Tu nombre</label>
+                <input type="text" id="input-name" placeholder="¿Cómo te llaman?" autocomplete="name">
+            </div>
+
+            <div class="form-group">
+                <label for="input-email">Email de tu cuenta Spotify</label>
+                <input type="email" id="input-email" placeholder="tu@email.com" autocomplete="email">
+            </div>
+
+            <button class="btn-submit" id="btn-submit-waitlist">Unirme a la lista de espera</button>
+            <br>
+            <button class="btn-back" id="btn-back-home">← Volver</button>
+        </div>
+
+        <!-- ════════════════════════════════════
+             ESTADO 3: En lista de espera
+             ════════════════════════════════════ -->
+        <div class="state" id="state-waiting">
+            <div class="waiting-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                </svg>
+            </div>
+
+            <h2 class="waiting-title">¡Ya estás dentro!</h2>
+            <p class="waiting-sub">
+                Tu solicitud fue recibida. Te notificaremos al email que registraste cuando tu acceso esté activado.<br><br>
+                <strong>Playcount está en beta cerrado</strong> mientras terminamos de ajustar todo para que sea perfecto.
+            </p>
+
+            <div class="waiting-badge">
+                <div class="badge-dot"></div>
+                En lista de espera
+            </div>
+
+            <p class="footer-note" style="margin-top: 20px; font-size: 0.7rem;">
+                ¿Ya recibiste confirmación?
+                <button class="already-link" id="btn-already-access-2" style="font-size: 0.7rem;">Iniciar sesión →</button>
+            </p>
+        </div>
+
     </div>
 
     <script type="module" src="js/auth.js"></script>
