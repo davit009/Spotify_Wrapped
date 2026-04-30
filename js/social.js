@@ -4,6 +4,23 @@ let activeChallenges = [];
 let currentFilter = 'today';
 let currentUserData = null;
 
+// ── Sistema de Toast Notifications ──
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const icon = type === 'success'
+        ? `<svg width="13" height="13" fill="none" stroke="#1DB954" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/></svg>`
+        : `<svg width="13" height="13" fill="none" stroke="#ef4444" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>`;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `${icon}<span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('out');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    }, 3000);
+}
+
 export async function initSocial(currentUser) {
     currentUserData = currentUser;
     const filters = ['today', 'week', 'month'];
@@ -91,8 +108,8 @@ async function handleIncomingInvite(currentUserId) {
                 if (!error) {
                     // Limpiar URL ANTES de recargar para no repetir el proceso
                     window.history.replaceState({}, document.title, window.location.pathname);
-                    alert("¡Nuevo amigo añadido correctamente!");
-                    window.location.href = window.location.pathname;
+                    showToast('¡Nuevo amigo añadido!');
+                    setTimeout(() => window.location.href = window.location.pathname, 1500);
                 }
             }
         } catch (e) {
@@ -310,7 +327,10 @@ async function loadPendingRequests(userId) {
     requests?.forEach(req => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(req.creator.avatar_url, req.creator.display_name, 'w-10 h-10')}<span class="text-sm font-bold text-white">${req.creator.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Aceptar</button>`;
+        // Null-guard: req.creator es null cuando RLS bloquea la lectura del perfil del remitente
+        const creatorName = req.creator?.display_name || 'Usuario';
+        const creatorAvatar = req.creator?.avatar_url || '';
+        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(creatorAvatar, creatorName, 'w-10 h-10')}<span class="text-sm font-bold text-white">${creatorName}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Aceptar</button>`;
         container.appendChild(div);
         div.querySelector('button').addEventListener('click', () => respondChallenge(req.id, 'active', userId));
     });
@@ -330,7 +350,25 @@ async function loadActiveChallengesList(userId) {
         div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
         div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(otherUser.avatar_url, otherUser.display_name, 'w-12 h-12')}<div><p class="text-sm font-bold text-white">${otherUser.display_name}</p><p class="text-[8px] text-neutral-500 uppercase tracking-widest font-black">Activo</p></div></div><button class="text-[9px] font-black text-neutral-600 hover:text-red-500 uppercase">Remover</button>`;
         list.appendChild(div);
-        div.querySelector('button').addEventListener('click', () => { if(confirm(`¿Remover comparativa con ${otherUser.display_name}?`)) respondChallenge(ch.id, 'finished', userId); });
+        div.querySelector('button').addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            if (btn.dataset.confirmed === '1') {
+                respondChallenge(ch.id, 'finished', userId);
+            } else {
+                btn.dataset.confirmed = '1';
+                btn.textContent = '¿Confirmar?';
+                btn.classList.remove('text-neutral-600');
+                btn.classList.add('text-red-400');
+                setTimeout(() => {
+                    if (btn.isConnected) {
+                        btn.dataset.confirmed = '0';
+                        btn.textContent = 'Remover';
+                        btn.classList.remove('text-red-400');
+                        btn.classList.add('text-neutral-600');
+                    }
+                }, 3000);
+            }
+        });
     });
 }
 
@@ -345,7 +383,7 @@ function renderSearchResults(users, currentUserId) {
         div.querySelector('button').addEventListener('click', async () => {
             const start = new Date(); const end = new Date(); end.setFullYear(end.getFullYear() + 1);
             await supabaseClient.from('challenges').insert({ creator_id: currentUserId, opponent_id: u.id, start_date: start.toISOString(), end_date: end.toISOString(), status: 'pending' });
-            alert("Invitación enviada.");
+            showToast(`Solicitud enviada a ${u.display_name} ✅`);
         });
     });
 }
