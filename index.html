@@ -122,6 +122,10 @@
         #login-btn:active { transform: scale(0.97); }
 
         .footer-note { margin-top: 18px; font-size: 0.68rem; color: rgba(255,255,255,0.2); }
+
+        /* La tarjeta se oculta inicialmente hasta verificar sesión */
+        .card { display: none; }
+        .card.visible { display: flex; flex-direction: column; }
     </style>
 </head>
 <body>
@@ -129,14 +133,7 @@
     <div class="orb orb-2"></div>
     <div class="orb orb-3"></div>
 
-    <style>
-        .card {
-            display: none;
-            /* other styles remain from original but we inject display none inline below */
-        }
-    </style>
-    <!-- We'll do it inline to avoid breaking existing styles -->
-    <div class="card" id="login-card" style="display: none;">
+    <div class="card" id="login-card">
         <div class="logo">Play<span>count</span></div>
         <p class="tagline">Descubre cuántas horas de tu vida has vivido con música.<br>En tiempo real y con historial completo.</p>
 
