@@ -127,7 +127,8 @@ function formatTime(ms) {
 function getAvatarHTML(url, name, sizeClass = "w-20 h-20", isRobot = false) {
     if (isRobot) return `<div class="${sizeClass} rounded-full bg-white/5 flex items-center justify-center text-2xl sm:text-4xl border border-white/10 shadow-xl">🤖</div>`;
     if (url && url.trim() !== '') return `<img src="${url}" class="${sizeClass} rounded-full border border-white/20 shadow-2xl object-cover">`;
-    const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
+    // filter(Boolean) evita crash con strings vacios al hacer split
+    const initials = name ? name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
     return `<div class="${sizeClass} rounded-full avatar-fallback text-[10px] sm:text-sm tracking-widest border border-white/10">${initials}</div>`;
 }
 
@@ -215,7 +216,10 @@ async function renderArena(userId) {
     }
 
     const userAvatar = getAvatarHTML(currentUserData?.user_metadata?.avatar_url, "Tú", "w-16 h-16 sm:w-24 sm:h-24");
-    const friendAvatar = getAvatarHTML(otherUser.avatar_url, otherUser.display_name, "w-16 h-16 sm:w-24 sm:h-24", otherUser.display_name.toUpperCase().includes('ROBOT'));
+    // Optional chaining en display_name: puede ser null si RLS bloquea el join
+    const friendName = otherUser.display_name || 'Usuario';
+    const isRobot = friendName.toUpperCase().includes('ROBOT');
+    const friendAvatar = getAvatarHTML(otherUser.avatar_url, friendName, "w-16 h-16 sm:w-24 sm:h-24", isRobot);
 
     container.innerHTML = `
         <div class="glass w-full rounded-[3rem] sm:rounded-[4rem] p-8 sm:p-20 relative overflow-hidden flex flex-col items-center">
@@ -330,14 +334,35 @@ async function loadPendingRequests(userId) {
         // Null-guard: req.creator es null cuando RLS bloquea la lectura del perfil del remitente
         const creatorName = req.creator?.display_name || 'Usuario';
         const creatorAvatar = req.creator?.avatar_url || '';
-        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(creatorAvatar, creatorName, 'w-10 h-10')}<span class="text-sm font-bold text-white">${creatorName}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Aceptar</button>`;
+        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(creatorAvatar, creatorName, 'w-10 h-10')}<span class="text-sm font-bold text-white">${creatorName}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full transition-opacity">Aceptar</button>`;
         container.appendChild(div);
-        div.querySelector('button').addEventListener('click', () => respondChallenge(req.id, 'active', userId));
+        div.querySelector('button').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            btn.textContent = 'Aceptando...';
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            await respondChallenge(req.id, 'active', userId);
+        });
     });
 }
 
 async function respondChallenge(challengeId, status, userId) {
-    await supabaseClient.from('challenges').update({ status }).eq('id', challengeId);
+    const { error } = await supabaseClient.from('challenges').update({ status }).eq('id', challengeId);
+    if (!error) {
+        if (status === 'active') {
+            showToast('¡Solicitud aceptada! Ya puedes comparar música');
+            document.getElementById('friend-modal').classList.add('hidden');
+        } else if (status === 'finished') {
+            showToast('Comparativa eliminada correctamente', 'error');
+            document.getElementById('friend-modal').classList.add('hidden');
+        } else {
+            showToast('Solicitud rechazada', 'error');
+            document.getElementById('friend-modal').classList.add('hidden');
+        }
+    } else {
+        showToast('Error: no tienes permiso o ya fue procesado', 'error');
+        console.error('respondChallenge error:', error);
+    }
     loadSocialPage(userId);
 }
 
@@ -350,17 +375,21 @@ async function loadActiveChallengesList(userId) {
         div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
         div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(otherUser.avatar_url, otherUser.display_name, 'w-12 h-12')}<div><p class="text-sm font-bold text-white">${otherUser.display_name}</p><p class="text-[8px] text-neutral-500 uppercase tracking-widest font-black">Activo</p></div></div><button class="text-[9px] font-black text-neutral-600 hover:text-red-500 uppercase">Remover</button>`;
         list.appendChild(div);
-        div.querySelector('button').addEventListener('click', (e) => {
+        div.querySelector('button').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             if (btn.dataset.confirmed === '1') {
-                respondChallenge(ch.id, 'finished', userId);
+                // Estado de carga en el segundo click
+                btn.disabled = true;
+                btn.textContent = 'Eliminando...';
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                await respondChallenge(ch.id, 'finished', userId);
             } else {
                 btn.dataset.confirmed = '1';
                 btn.textContent = '¿Confirmar?';
                 btn.classList.remove('text-neutral-600');
                 btn.classList.add('text-red-400');
                 setTimeout(() => {
-                    if (btn.isConnected) {
+                    if (btn.isConnected && btn.dataset.confirmed === '1') {
                         btn.dataset.confirmed = '0';
                         btn.textContent = 'Remover';
                         btn.classList.remove('text-red-400');
