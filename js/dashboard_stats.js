@@ -64,6 +64,94 @@ async function loadTops(userId, session) {
     weeklyTracks = weekData;
     renderTopCard('card-top-today', todayData[0]);
     renderTopCard('card-top-week', weekData[0]);
+    
+    // Cargar sugerencia basada en el historial reciente
+    loadRecommendation(userId, session);
+}
+
+async function loadRecommendation(userId, session) {
+    const token = await getValidToken(userId);
+    if (!token) return;
+
+    // Para que la recomendación sea más precisa y represente el gusto general,
+    // combinamos el historial de hoy y de la semana.
+    const allRecent = [...dailyTracks, ...weeklyTracks];
+    if (allRecent.length === 0) return;
+
+    // Eliminar canciones duplicadas
+    const uniqueTracks = [];
+    const seenIds = new Set();
+    for (const t of allRecent) {
+        if (!seenIds.has(t.id)) {
+            uniqueTracks.push(t);
+            seenIds.add(t.id);
+        }
+    }
+
+    // Spotify permite un MÁXIMO ESTRICTO de 5 "semillas" en total (canciones + artistas).
+    // Usaremos 4 canciones diferentes y 1 artista para darle al algoritmo la imagen más amplia posible.
+    const topTracks = uniqueTracks.slice(0, 4);
+    const seedTracks = topTracks.map(t => t.id).join(',');
+    
+    // Tomamos el artista principal como semilla extra
+    const seedArtists = topTracks[0]?.artists[0]?.id || '';
+
+    let url = `https://api.spotify.com/v1/recommendations?limit=1&seed_tracks=${seedTracks}`;
+    if (seedArtists) url += `&seed_artists=${seedArtists}`;
+
+    try {
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.tracks && data.tracks.length > 0) {
+            const track = data.tracks[0];
+            const reasonText = dailyTracks.length > 0 ? "Basado en lo que escuchaste hoy" : "Basado en tu actividad reciente";
+            
+            // Renderizar la UI
+            const card = document.getElementById('recommendation-card');
+            if (card) {
+                document.getElementById('rec-title').textContent = track.name;
+                document.getElementById('rec-artist').textContent = track.artists.map(a => a.name).join(', ');
+                const imgUrl = track.album?.images[0]?.url || '';
+                document.getElementById('rec-img').src = imgUrl;
+                const bg = document.getElementById('rec-bg');
+                if (bg) bg.style.backgroundImage = `url(${imgUrl})`;
+                document.getElementById('rec-reason').textContent = reasonText;
+                card.classList.remove('hidden');
+
+                // Lógica del botón de Play (Preview o abrir en Spotify)
+                const playBtn = document.getElementById('rec-play-btn');
+                if (playBtn) {
+                    if (track.preview_url) {
+                        playBtn.onclick = () => {
+                            if (window.recAudio) {
+                                window.recAudio.pause();
+                                if (window.recAudio.src === track.preview_url) {
+                                    window.recAudio = null;
+                                    playBtn.innerHTML = '<svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+                                    return;
+                                }
+                            }
+                            window.recAudio = new Audio(track.preview_url);
+                            window.recAudio.volume = 0.5;
+                            window.recAudio.play();
+                            playBtn.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+                            window.recAudio.onended = () => {
+                                playBtn.innerHTML = '<svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+                            };
+                        };
+                    } else {
+                        // Si no hay preview, el botón abre la canción en Spotify
+                        playBtn.onclick = () => window.open(track.external_urls.spotify, '_blank');
+                        playBtn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+                    }
+                }
+            }
+        }
+    } catch(e) {
+        console.error("Error cargando recomendación:", e);
+    }
 }
 
 async function getTopTracks(userId, sinceIso, session) {
