@@ -256,11 +256,26 @@ async function renderArena(userId) {
 
             ${winHistoryHTML}
             
-            <div class="py-3 px-8 sm:py-4 sm:px-12 bg-white/[0.03] rounded-2xl sm:rounded-3xl border border-white/5 backdrop-blur-md">
-                <p class="text-center text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-neutral-400 italic">
-                    ${myTime >= friendTime ? 'Vas arriba' : 'Vas abajo'}
-                </p>
-            </div>
+            ${(() => {
+                if (myTime > friendTime) return `
+                    <div class="py-3 px-8 sm:py-4 sm:px-12 bg-[#1DB954]/10 rounded-2xl sm:rounded-3xl border border-[#1DB954]/30 backdrop-blur-md shadow-[0_0_20px_rgba(29,185,84,0.15)]">
+                        <p class="text-center text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-[#1DB954] italic">
+                            🏆 ¡Vas ganando!
+                        </p>
+                    </div>`;
+                if (myTime < friendTime) return `
+                    <div class="py-3 px-8 sm:py-4 sm:px-12 bg-red-500/10 rounded-2xl sm:rounded-3xl border border-red-500/30 backdrop-blur-md shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+                        <p class="text-center text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-red-400 italic">
+                            📉 Vas perdiendo
+                        </p>
+                    </div>`;
+                return `
+                    <div class="py-3 px-8 sm:py-4 sm:px-12 bg-amber-500/10 rounded-2xl sm:rounded-3xl border border-amber-500/30 backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+                        <p class="text-center text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-amber-400 italic">
+                            ⚖️ Empate exacto
+                        </p>
+                    </div>`;
+            })()}
         </div>
     `;
 }
