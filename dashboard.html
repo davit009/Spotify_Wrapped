@@ -56,11 +56,15 @@
         }
 
         .profile-dropdown {
+            position: fixed;
+            top: 68px;
+            right: 16px;
             transform-origin: top right;
             transition: all 0.2s ease-out;
             transform: scale(0.95);
             opacity: 0;
             pointer-events: none;
+            z-index: 200;
         }
 
         .profile-dropdown.active {
@@ -110,12 +114,12 @@
                 <img id="user-avatar" src="" class="w-8 h-8 rounded-full bg-neutral-800">
                 <span id="user-name" class="text-xs font-bold truncate max-w-[80px]">...</span>
             </button>
-            <div id="profile-dropdown"
-                class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
-                <button id="logout-btn"
-                    class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl">Cerrar
-                    Sesión</button>
-            </div>
+        </div>
+        <!-- Dropdown: fixed positioning funciona en mobile y desktop -->
+        <div id="profile-dropdown"
+            class="profile-dropdown w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1">
+            <button id="logout-btn"
+                class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl">Cerrar sesión</button>
         </div>
     </header>
 
@@ -239,6 +243,14 @@
                 document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
                 document.getElementById('user-avatar-mobile').src = session.user.user_metadata.avatar_url;
             }
+
+            // Persistir provider_token en DB (crucial para usuarios nuevos)
+            if (session.provider_token) {
+                await supabaseClient.from('users').update({
+                    spotify_access_token: session.provider_token
+                }).eq('id', session.user.id);
+            }
+
             await initDashboard(session);
             syncOfflineHistory(session);
             setInterval(() => checkCurrentlyPlaying(session), 5000);
@@ -257,9 +269,20 @@
         };
         document.getElementById('profile-btn')?.addEventListener('click', toggleMenu);
         document.getElementById('profile-btn-mobile')?.addEventListener('click', toggleMenu);
-        
-        document.addEventListener('click', () => document.getElementById('profile-dropdown').classList.remove('active'));
-        document.getElementById('logout-btn')?.addEventListener('click', () => supabaseClient.auth.signOut());
+
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('profile-dropdown');
+            const btnDesktop = document.getElementById('profile-btn');
+            const btnMobile = document.getElementById('profile-btn-mobile');
+            if (!dropdown.contains(e.target) && e.target !== btnDesktop && e.target !== btnMobile) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        document.getElementById('logout-btn')?.addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            window.location.href = 'index.html';
+        });
         document.getElementById('close-list-modal').addEventListener('click', () => document.getElementById('list-modal').classList.add('hidden'));
     </script>
 </body>
