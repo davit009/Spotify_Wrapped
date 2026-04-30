@@ -105,27 +105,35 @@ async function loadRecommendation(userId, session) {
     const topTracks = uniqueTracks.slice(0, 4);
     if (topTracks.length === 0) return; // Failsafe
 
-    const seedTracks = topTracks.map(t => t.id).join(',');
-    const seedArtists = topTracks[0]?.artists[0]?.id || '';
+    // Spotify restringió su API de Inteligencia Artificial para apps nuevas (Error 404).
+    // Solución alternativa: Buscar las canciones más populares del artista que más escuchaste,
+    // y recomendarte una que NO hayas escuchado recientemente.
+    
+    const topArtistId = topTracks[0]?.artists[0]?.id;
+    const topArtistName = topTracks[0]?.artists[0]?.name;
+    if (!topArtistId) return;
 
-    let url = `https://api.spotify.com/v1/recommendations?limit=1&seed_tracks=${seedTracks}`;
-    if (seedArtists) url += `&seed_artists=${seedArtists}`;
+    let url = `https://api.spotify.com/v1/artists/${topArtistId}/top-tracks`; // Usa el top del artista
 
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) {
             console.error("Spotify API Error:", await res.text());
             titleEl.textContent = 'No pudimos cargar sugerencias';
-            artistEl.textContent = 'Intenta escuchar más música';
-            reasonEl.textContent = 'Spotify necesita más datos variados.';
+            artistEl.textContent = 'Restricción de la API de Spotify';
+            reasonEl.textContent = '';
             return;
         }
         
         const data = await res.json();
         
         if (data.tracks && data.tracks.length > 0) {
-            const track = data.tracks[0];
-            const reasonText = dailyTracks.length > 0 ? "Basado en tu vibra de hoy" : "Basado en tu vibra de esta semana";
+            // Filtrar para no recomendar algo que el usuario ya escuchó
+            const unplayedTracks = data.tracks.filter(t => !seenIds.has(t.id));
+            
+            // Si ya escuchó todas las top, le damos la #1 por defecto, si no, la primera que no haya escuchado
+            const track = unplayedTracks.length > 0 ? unplayedTracks[0] : data.tracks[0];
+            const reasonText = `Porque has estado escuchando a ${topArtistName}`;
             
             titleEl.textContent = track.name;
             artistEl.textContent = track.artists.map(a => a.name).join(', ');
