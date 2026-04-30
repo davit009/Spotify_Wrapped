@@ -38,7 +38,7 @@ export async function initSocial(currentUser) {
             const query = e.target.value.trim();
             if (query.length < 2) return;
             timeout = setTimeout(async () => {
-                const { data } = await supabaseClient.from('users_public').select('id, display_name, avatar_url').ilike('display_name', `%${query}%`).neq('id', currentUser.id).limit(5);
+                const { data } = await supabaseClient.from('users').select('id, display_name, avatar_url').ilike('display_name', `%${query}%`).neq('id', currentUser.id).limit(5);
                 renderSearchResults(data, currentUser.id);
             }, 400);
         });
@@ -89,14 +89,12 @@ async function handleIncomingInvite(currentUserId) {
                 });
 
                 if (!error) {
+                    // Limpiar URL ANTES de recargar para no repetir el proceso
+                    window.history.replaceState({}, document.title, window.location.pathname);
                     alert("¡Nuevo amigo añadido correctamente!");
-                    // Recargar para ver los cambios
                     window.location.href = window.location.pathname;
                 }
             }
-            
-            // Limpiar la URL sin recargar (opcional, pero ayuda a no repetir el proceso)
-            window.history.replaceState({}, document.title, window.location.pathname);
         } catch (e) {
             console.error('Error al procesar invitación:', e);
         }
@@ -139,10 +137,10 @@ function updateFilterUI() {
         const btn = document.getElementById(`filter-${f}`);
         if (f === currentFilter) {
             btn.classList.add('bg-[#1DB954]', 'text-black');
-            btn.classList.remove('text-neutral-400');
+            btn.classList.remove('text-neutral-400', 'text-neutral-500');
         } else {
             btn.classList.remove('bg-[#1DB954]', 'text-black');
-            btn.classList.add('text-neutral-400');
+            btn.classList.add('text-neutral-500');
         }
     });
 }
@@ -171,6 +169,12 @@ async function renderArena(userId) {
     const ch = activeChallenges[0];
     const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
     const opponentId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
+
+    // Null-guard: el amigo fue eliminado de la DB pero el challenge sigue activo
+    if (!otherUser) {
+        container.innerHTML = `<div class="glass p-12 sm:p-20 rounded-[3rem] w-full text-center"><p class="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">El usuario ya no está disponible</p></div>`;
+        return;
+    }
 
     const startDate = new Date();
     if (currentFilter === 'today') startDate.setHours(0,0,0,0);
@@ -264,25 +268,31 @@ async function updateStreakAndMatch(userId) {
     const ch = activeChallenges[0];
     const friendId = ch.creator_id === userId ? ch.opponent_id : ch.creator_id;
     const streakCard = document.getElementById('streak-card');
+    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+
+    // Optimización: 2 queries en lugar de hasta 60. Traemos 30 días de una vez y calculamos en JS.
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); thirtyDaysAgo.setHours(0,0,0,0);
+    const [{ data: myAll }, { data: friAll }] = await Promise.all([
+        supabaseClient.from('listening_sessions').select('duration_ms, played_at, track_id').eq('user_id', userId).gte('played_at', thirtyDaysAgo.toISOString()),
+        supabaseClient.from('listening_sessions').select('duration_ms, played_at, track_id').eq('user_id', friendId).gte('played_at', thirtyDaysAgo.toISOString())
+    ]);
 
     let streakCount = 0;
-    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
     for (let i = 1; i < 30; i++) {
-        const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0,0,0,0);
-        if (d < new Date(ch.start_date)) break;
-        const [myT, friT] = await Promise.all([getListeningTimeInRange(userId, d.toISOString(), new Date(d).setHours(23,59,59,999)), getListeningTimeInRange(friendId, d.toISOString(), new Date(d).setHours(23,59,59,999))]);
-        if (myT > friT) streakCount++; else break;
+        const dayStart = new Date(); dayStart.setDate(dayStart.getDate() - i); dayStart.setHours(0,0,0,0);
+        const dayEnd = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+        if (dayStart < new Date(ch.start_date)) break;
+        const myD = (myAll || []).filter(s => { const t = new Date(s.played_at); return t >= dayStart && t <= dayEnd; }).reduce((a, s) => a + s.duration_ms, 0);
+        const friD = (friAll || []).filter(s => { const t = new Date(s.played_at); return t >= dayStart && t <= dayEnd; }).reduce((a, s) => a + s.duration_ms, 0);
+        if (myD > friD) streakCount++; else break;
     }
 
-    if (streakCount > 0) {
-        streakCard.classList.remove('hidden');
-        document.getElementById('streak-days').textContent = streakCount;
-    } else streakCard.classList.add('hidden');
+    if (streakCount > 0) { streakCard.classList.remove('hidden'); document.getElementById('streak-days').textContent = streakCount; }
+    else streakCard.classList.add('hidden');
 
-    const { data: myS } = await supabaseClient.from('listening_sessions').select('track_id').eq('user_id', userId).gte('played_at', startOfToday.toISOString());
-    const { data: friS } = await supabaseClient.from('listening_sessions').select('track_id').eq('user_id', friendId).gte('played_at', startOfToday.toISOString());
-    const myTracks = new Set((myS || []).map(s => s.track_id));
-    const common = (friS || []).filter(s => myTracks.has(s.track_id));
+    // Canciones en común hoy
+    const myTodayTracks = new Set((myAll || []).filter(s => new Date(s.played_at) >= startOfToday).map(s => s.track_id));
+    const common = (friAll || []).filter(s => new Date(s.played_at) >= startOfToday && myTodayTracks.has(s.track_id));
     const matchCard = document.getElementById('match-card');
     if (common.length > 0) { matchCard.classList.remove('hidden'); document.getElementById('match-count').textContent = common.length; }
     else matchCard.classList.add('hidden');
@@ -300,7 +310,7 @@ async function loadPendingRequests(userId) {
     requests?.forEach(req => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3"><img src="${req.creator.avatar_url || ''}" class="w-10 h-10 rounded-full border border-white/10"><span class="text-sm font-bold text-white">${req.creator.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Aceptar</button>`;
+        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(req.creator.avatar_url, req.creator.display_name, 'w-10 h-10')}<span class="text-sm font-bold text-white">${req.creator.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Aceptar</button>`;
         container.appendChild(div);
         div.querySelector('button').addEventListener('click', () => respondChallenge(req.id, 'active', userId));
     });
@@ -318,7 +328,7 @@ async function loadActiveChallengesList(userId) {
         const otherUser = ch.creator_id === userId ? ch.opponent : ch.creator;
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3"><img src="${otherUser.avatar_url || ''}" class="w-12 h-12 rounded-full border border-white/10"><div><p class="text-sm font-bold text-white">${otherUser.display_name}</p><p class="text-[8px] text-neutral-500 uppercase tracking-widest font-black">Activo</p></div></div><button class="text-[9px] font-black text-neutral-600 hover:text-red-500 uppercase">Remover</button>`;
+        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(otherUser.avatar_url, otherUser.display_name, 'w-12 h-12')}<div><p class="text-sm font-bold text-white">${otherUser.display_name}</p><p class="text-[8px] text-neutral-500 uppercase tracking-widest font-black">Activo</p></div></div><button class="text-[9px] font-black text-neutral-600 hover:text-red-500 uppercase">Remover</button>`;
         list.appendChild(div);
         div.querySelector('button').addEventListener('click', () => { if(confirm(`¿Remover comparativa con ${otherUser.display_name}?`)) respondChallenge(ch.id, 'finished', userId); });
     });
@@ -330,7 +340,7 @@ function renderSearchResults(users, currentUserId) {
     users.forEach(u => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5";
-        div.innerHTML = `<div class="flex items-center gap-3"><img src="${u.avatar_url || ''}" class="w-12 h-12 rounded-full border border-white/10"><span class="text-sm font-bold text-white">${u.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Invitar</button>`;
+        div.innerHTML = `<div class="flex items-center gap-3">${getAvatarHTML(u.avatar_url, u.display_name, 'w-12 h-12')}<span class="text-sm font-bold text-white">${u.display_name}</span></div><button class="bg-white text-black text-[10px] font-black px-6 py-2.5 rounded-full">Invitar</button>`;
         container.appendChild(div);
         div.querySelector('button').addEventListener('click', async () => {
             const start = new Date(); const end = new Date(); end.setFullYear(end.getFullYear() + 1);

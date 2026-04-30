@@ -17,8 +17,22 @@
         #album-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; filter: blur(100px) saturate(1.8); opacity: 0; transition: opacity 3s ease; background-size: cover; background-position: center; }
         #album-bg.visible { opacity: 0.25; }
 
-        .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
+        .profile-dropdown {
+            position: fixed;
+            top: 68px;
+            right: 16px;
+            transform-origin: top right;
+            transition: all 0.2s ease-out;
+            transform: scale(0.95);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 200;
+        }
         .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
         .win-line { height: 3px; border-radius: 2px; flex: 1; transition: all 0.3s ease; }
         .win-user { background: #1DB954; box-shadow: 0 0 15px rgba(29, 185, 84, 0.5); }
@@ -38,7 +52,7 @@
         <div class="flex items-center gap-3 w-full md:w-auto justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.4)]">
-                    <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
                 </div>
                 <h1 class="text-xl font-black tracking-tighter">Playcount</h1>
             </div>
@@ -58,10 +72,11 @@
                 <img id="user-avatar" src="" class="w-8 h-8 rounded-full bg-neutral-800 object-cover">
                 <span id="user-name" class="text-xs font-bold truncate max-w-[80px]">...</span>
             </button>
-            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
-                <button id="open-friends-btn" class="w-full text-left px-4 py-2.5 hover:bg-white/5 text-white font-bold text-xs rounded-xl mb-1">Gestionar Amigos</button>
-                <button id="logout-btn" class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl">Cerrar Sesión</button>
-            </div>
+        </div>
+        <!-- Dropdown fixed: funciona en mobile y desktop -->
+        <div id="profile-dropdown" class="profile-dropdown w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1">
+            <button id="open-friends-btn" class="w-full text-left px-4 py-2.5 hover:bg-white/5 text-white font-bold text-xs rounded-xl mb-1">Gestionar Amigos</button>
+            <button id="logout-btn" class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl">Cerrar Sesión</button>
         </div>
     </header>
 
@@ -97,6 +112,11 @@
             </div>
         </div>
     </main>
+
+    <!-- Botón flotante de amigos (solo mobile) -->
+    <button id="fab-friends-btn" class="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-[#1DB954] text-black rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(29,185,84,0.5)] z-[150] hover:scale-105 transition-transform">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    </button>
 
     <!-- MODAL DE AMIGOS -->
     <div id="friend-modal" class="fixed inset-0 bg-black/90 backdrop-blur-2xl z-[300] hidden flex items-center justify-center p-4">
@@ -143,7 +163,19 @@
                 const toggleMenu = (e) => { e.stopPropagation(); menu.classList.toggle('active'); };
                 document.getElementById('profile-btn')?.addEventListener('click', toggleMenu);
                 document.getElementById('profile-btn-mobile')?.addEventListener('click', toggleMenu);
-                document.addEventListener('click', () => menu.classList.remove('active'));
+                document.addEventListener('click', (e) => {
+                    const btnD = document.getElementById('profile-btn');
+                    const btnM = document.getElementById('profile-btn-mobile');
+                    if (!menu.contains(e.target) && e.target !== btnD && e.target !== btnM) {
+                        menu.classList.remove('active');
+                    }
+                });
+
+                // Botón FAB de amigos en móvil
+                document.getElementById('fab-friends-btn')?.addEventListener('click', () => {
+                    document.getElementById('friend-modal').classList.remove('hidden');
+                    switchTab('search', user.id);
+                });
 
                 document.getElementById('logout-btn').onclick = async () => {
                     await supabaseClient.auth.signOut();
