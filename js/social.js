@@ -564,7 +564,8 @@ async function confirmAndSendShare(senderId, receiverId, trackData) {
 }
 
 /**
- * Carga la pestaña "Para ti" con las canciones recibidas
+ * Carga la pestaña "Para ti" con las canciones recibidas.
+ * Usa 2 queries separadas para evitar el join roto con auth.users.
  */
 export async function loadForYouTab(userId) {
     const container = document.getElementById('foryou-list');
@@ -572,17 +573,34 @@ export async function loadForYouTab(userId) {
 
     container.innerHTML = '<p class="text-[9px] text-neutral-600 text-center py-8">Cargando...</p>';
 
+    // Query 1: traer los shares sin join
     const { data: shares, error } = await supabaseClient
         .from('song_shares')
-        .select('*, sender:sender_id (display_name, avatar_url)')
+        .select('id, sender_id, track_name, artist_name, album_art_url, spotify_url, message, seen, created_at')
         .eq('receiver_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
 
-    if (error || !shares || shares.length === 0) {
+    if (error) {
+        console.error('loadForYouTab error:', error);
+        container.innerHTML = '<p class="text-[9px] text-red-400 text-center py-8">Error al cargar</p>';
+        return;
+    }
+
+    if (!shares || shares.length === 0) {
         container.innerHTML = '<p class="text-[9px] text-neutral-600 text-center py-8 uppercase tracking-[0.3em]">Aún no tienes canciones compartidas</p>';
         return;
     }
+
+    // Query 2: traer nombres de los remitentes desde public.users
+    const senderIds = [...new Set(shares.map(s => s.sender_id))];
+    const { data: senders } = await supabaseClient
+        .from('users')
+        .select('id, display_name')
+        .in('id', senderIds);
+
+    const senderMap = {};
+    (senders || []).forEach(u => { senderMap[u.id] = u.display_name; });
 
     // Marcar todas como vistas
     const unseenIds = shares.filter(s => !s.seen).map(s => s.id);
@@ -593,22 +611,24 @@ export async function loadForYouTab(userId) {
 
     container.innerHTML = '';
     shares.forEach(share => {
-        const senderName = share.sender?.display_name || 'Alguien';
+        const senderName = senderMap[share.sender_id] || 'Alguien';
         const art        = share.album_art_url || '';
         const date       = new Date(share.created_at);
         const dateStr    = date.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+        // Las nuevas (unseen antes del update) tenían seen=false
+        const isNew      = unseenIds.includes(share.id);
 
         const card = document.createElement('div');
         card.className = `flex items-center gap-4 p-4 rounded-3xl border transition-all ${
-            share.seen ? 'bg-white/3 border-white/5' : 'bg-[#1DB954]/5 border-[#1DB954]/20'
+            isNew ? 'bg-[#1DB954]/5 border-[#1DB954]/20' : 'bg-white/[0.02] border-white/5'
         }`;
         card.innerHTML = `
-            <img src="${art}" class="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-lg">
+            <img src="${art}" class="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-lg" onerror="this.style.display='none'">
             <div class="flex-1 min-w-0">
                 <p class="text-[10px] font-black text-white truncate">${share.track_name}</p>
                 <p class="text-[9px] text-neutral-500 truncate mb-1">${share.artist_name}</p>
                 ${share.message ? `<p class="text-[9px] text-[#1DB954]/80 italic truncate">"${share.message}"</p>` : ''}
-                <p class="text-[8px] text-neutral-700 uppercase tracking-widest mt-1">${senderName} · ${dateStr}</p>
+                <p class="text-[8px] text-neutral-700 uppercase tracking-widest mt-1">${senderName} · ${dateStr}${isNew ? ' · <span class="text-[#1DB954]">Nueva</span>' : ''}</p>
             </div>
             <a href="${share.spotify_url}" target="_blank" rel="noopener noreferrer"
                class="shrink-0 flex items-center gap-1.5 bg-[#1DB954] text-black text-[8px] font-black px-3 py-2 rounded-xl hover:bg-[#1ed760] transition-colors shadow-[0_0_12px_rgba(29,185,84,0.25)]">
@@ -619,6 +639,7 @@ export async function loadForYouTab(userId) {
         container.appendChild(card);
     });
 }
+
 
 /**
  * Cuenta shares no vistos y actualiza el badge en la UI
