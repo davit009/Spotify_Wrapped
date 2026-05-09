@@ -67,28 +67,63 @@ export async function checkCurrentlyPlaying(session) {
 
 /**
  * Controles de reproducción
+ * La API requiere: scope user-modify-playback-state y un dispositivo activo.
  */
 export async function spotifyControl(action, session) {
     const token = await getValidToken(session.user.id);
-    if (!token) return;
+    if (!token) { console.warn('spotifyControl: sin token'); return; }
 
-    let url = 'https://api.spotify.com/v1/me/player/';
-    let method = 'POST';
+    try {
+        // Primero verificar que hay un dispositivo activo
+        const stateRes = await fetch('https://api.spotify.com/v1/me/player', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
 
-    if (action === 'next') url += 'next';
-    else if (action === 'prev') url += 'previous';
-    else if (action === 'play') {
-        // Necesitamos saber si está pausado o no
-        const stateRes = await fetch('https://api.spotify.com/v1/me/player', { headers: {'Authorization': `Bearer ${token}`} });
-        if (stateRes.ok) {
-            const state = await stateRes.json();
-            url += state.is_playing ? 'pause' : 'play';
-            method = 'PUT';
+        // 204 = no hay dispositivo activo, no se puede controlar
+        if (stateRes.status === 204 || !stateRes.ok) {
+            console.warn('spotifyControl: no hay dispositivo activo en Spotify');
+            return;
         }
-    }
 
-    await fetch(url, { method, headers: {'Authorization': `Bearer ${token}`} });
-    setTimeout(() => checkCurrentlyPlaying(session), 500); // Refrescar rápido tras acción
+        const state = await stateRes.json();
+        if (!state?.device) { console.warn('spotifyControl: device undefined'); return; }
+
+        let url    = 'https://api.spotify.com/v1/me/player/';
+        let method = 'POST';
+
+        if (action === 'next') {
+            url += 'next';
+        } else if (action === 'prev') {
+            url += 'previous';
+        } else if (action === 'play') {
+            // Toggle play/pause según estado actual
+            if (state.is_playing) {
+                url   += 'pause';
+                method = 'PUT';
+            } else {
+                url   += 'play';
+                method = 'PUT';
+            }
+        }
+
+        const res = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // 204 = éxito sin cuerpo (normal para estos endpoints)
+        if (!res.ok && res.status !== 204) {
+            const err = await res.text();
+            console.error(`spotifyControl ${action} error ${res.status}:`, err);
+        }
+
+        // Refrescar UI tras la acción (con doble reintento para dar tiempo a Spotify)
+        setTimeout(() => checkCurrentlyPlaying(session), 400);
+        setTimeout(() => checkCurrentlyPlaying(session), 1200);
+
+    } catch (e) {
+        console.error('spotifyControl exception:', e);
+    }
 }
 
 function formatMs(ms) {
