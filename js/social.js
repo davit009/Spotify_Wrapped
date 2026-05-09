@@ -564,6 +564,28 @@ async function confirmAndSendShare(senderId, receiverId, trackData) {
 }
 
 /**
+ * Intenta abrir en la app de Spotify primero, fallback al navegador.
+ * spotify:track:ID → abre la app en iOS/Android si está instalada.
+ */
+function openSpotifyTrack(spotifyUrl) {
+    const match = spotifyUrl.match(/track\/([a-zA-Z0-9]+)/);
+    if (!match) { window.open(spotifyUrl, '_blank'); return; }
+
+    const trackId  = match[1];
+    const appUri   = `spotify:track:${trackId}`;
+    const webUrl   = spotifyUrl;
+
+    // Intentar abrir la app
+    window.location.href = appUri;
+
+    // Si la app no abre (el usuario no la tiene o está en desktop),
+    // abrir web tras 1.5s siempre que la página siga visible
+    setTimeout(() => {
+        if (!document.hidden) window.open(webUrl, '_blank');
+    }, 1500);
+}
+
+/**
  * Carga la pestaña "Para ti" con las canciones recibidas.
  * Usa 2 queries separadas para evitar el join roto con auth.users.
  */
@@ -588,11 +610,15 @@ export async function loadForYouTab(userId) {
     }
 
     if (!shares || shares.length === 0) {
-        container.innerHTML = '<p class="text-[9px] text-neutral-600 text-center py-8 uppercase tracking-[0.3em]">Aún no tienes canciones compartidas</p>';
+        container.innerHTML = `
+            <div class="flex flex-col items-center gap-3 py-10">
+                <div class="text-3xl opacity-20">🎵</div>
+                <p class="text-[9px] text-neutral-600 uppercase tracking-[0.3em] text-center">Aún no tienes canciones compartidas</p>
+            </div>`;
         return;
     }
 
-    // Query 2: traer nombres de los remitentes desde public.users
+    // Query 2: nombre del remitente desde public.users
     const senderIds = [...new Set(shares.map(s => s.sender_id))];
     const { data: senders } = await supabaseClient
         .from('users')
@@ -602,7 +628,7 @@ export async function loadForYouTab(userId) {
     const senderMap = {};
     (senders || []).forEach(u => { senderMap[u.id] = u.display_name; });
 
-    // Marcar todas como vistas
+    // Guardar IDs no vistos ANTES de marcarlos
     const unseenIds = shares.filter(s => !s.seen).map(s => s.id);
     if (unseenIds.length > 0) {
         await supabaseClient.from('song_shares').update({ seen: true }).in('id', unseenIds);
@@ -613,32 +639,61 @@ export async function loadForYouTab(userId) {
     shares.forEach(share => {
         const senderName = senderMap[share.sender_id] || 'Alguien';
         const art        = share.album_art_url || '';
-        const date       = new Date(share.created_at);
-        const dateStr    = date.toLocaleDateString('es', { day: '2-digit', month: 'short' });
-        // Las nuevas (unseen antes del update) tenían seen=false
         const isNew      = unseenIds.includes(share.id);
+        const date       = new Date(share.created_at);
+        const now        = new Date();
+        const diffH      = Math.round((now - date) / 3600000);
+        const timeStr    = diffH < 1 ? 'Hace un momento'
+                         : diffH < 24 ? `Hace ${diffH}h`
+                         : date.toLocaleDateString('es', { day: '2-digit', month: 'short' });
 
         const card = document.createElement('div');
-        card.className = `flex items-center gap-4 p-4 rounded-3xl border transition-all ${
-            isNew ? 'bg-[#1DB954]/5 border-[#1DB954]/20' : 'bg-white/[0.02] border-white/5'
+        card.className = `relative overflow-hidden rounded-3xl border transition-all duration-300 ${
+            isNew
+                ? 'bg-gradient-to-br from-[#1DB954]/8 to-transparent border-[#1DB954]/25'
+                : 'bg-white/[0.02] border-white/[0.06]'
         }`;
+
         card.innerHTML = `
-            <img src="${art}" class="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-lg" onerror="this.style.display='none'">
-            <div class="flex-1 min-w-0">
-                <p class="text-[10px] font-black text-white truncate">${share.track_name}</p>
-                <p class="text-[9px] text-neutral-500 truncate mb-1">${share.artist_name}</p>
-                ${share.message ? `<p class="text-[9px] text-[#1DB954]/80 italic truncate">"${share.message}"</p>` : ''}
-                <p class="text-[8px] text-neutral-700 uppercase tracking-widest mt-1">${senderName} · ${dateStr}${isNew ? ' · <span class="text-[#1DB954]">Nueva</span>' : ''}</p>
+            ${isNew ? '<div class="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-[#1DB954] shadow-[0_0_6px_#1DB954]"></div>' : ''}
+            <div class="flex items-center gap-4 p-4">
+                <div class="relative shrink-0">
+                    <img src="${art}" 
+                         class="w-14 h-14 rounded-2xl object-cover shadow-xl"
+                         onerror="this.parentElement.innerHTML='<div class=\'w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-xl\'>🎵</div>'">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-black text-white truncate leading-tight mb-0.5">${share.track_name}</p>
+                    <p class="text-[10px] text-neutral-400 truncate mb-2">${share.artist_name}</p>
+                    ${share.message
+                        ? `<div class="flex items-start gap-1 mb-2">
+                                <span class="text-[#1DB954] text-[11px] leading-none shrink-0">"</span>
+                                <p class="text-[9px] text-[#1DB954]/70 italic leading-snug">${share.message}</p>
+                           </div>`
+                        : ''}
+                    <div class="flex items-center gap-1.5">
+                        <div class="w-1 h-1 rounded-full ${isNew ? 'bg-[#1DB954]' : 'bg-neutral-700'}"></div>
+                        <p class="text-[8px] text-neutral-600 uppercase tracking-widest font-black">${senderName} · ${timeStr}</p>
+                    </div>
+                </div>
+                <button class="open-spotify-btn shrink-0 flex flex-col items-center gap-1 group">
+                    <div class="w-10 h-10 rounded-2xl bg-[#1DB954] flex items-center justify-center shadow-[0_0_16px_rgba(29,185,84,0.3)] group-hover:scale-110 group-hover:shadow-[0_0_24px_rgba(29,185,84,0.5)] transition-all duration-200">
+                        <svg class="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[7px] font-black uppercase tracking-widest text-neutral-600 group-hover:text-[#1DB954] transition-colors">Abrir</span>
+                </button>
             </div>
-            <a href="${share.spotify_url}" target="_blank" rel="noopener noreferrer"
-               class="shrink-0 flex items-center gap-1.5 bg-[#1DB954] text-black text-[8px] font-black px-3 py-2 rounded-xl hover:bg-[#1ed760] transition-colors shadow-[0_0_12px_rgba(29,185,84,0.25)]">
-                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                Abrir
-            </a>
         `;
+
+        // Deep link: intenta app primero, fallback web
+        card.querySelector('.open-spotify-btn').addEventListener('click', () => openSpotifyTrack(share.spotify_url));
+
         container.appendChild(card);
     });
 }
+
 
 
 /**

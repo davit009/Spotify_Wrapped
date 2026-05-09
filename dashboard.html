@@ -164,22 +164,7 @@
                         <h3 id="np-title" class="text-xl font-black text-white truncate">...</h3>
                         <p id="np-artist" class="text-sm text-neutral-400 truncate mb-4">...</p>
 
-                        <!-- CONTROLES DE REPRODUCCIÓN -->
-                        <div class="flex items-center justify-center sm:justify-start gap-6 mb-6">
-                            <button id="np-prev" class="text-neutral-500 hover:text-white transition-colors"><svg
-                                    class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
-                                </svg></button>
-                            <button id="np-play"
-                                class="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform"><svg
-                                    id="play-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg></button>
-                            <button id="np-next" class="text-neutral-500 hover:text-white transition-colors"><svg
-                                    class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M6 18l8.5-6L6 6zM16 6v12h2V6z" />
-                                </svg></button>
-                        </div>
+
 
                         <div class="w-full bg-white/5 h-1 rounded-full overflow-hidden mb-2">
                             <div id="np-progress-bar"
@@ -278,11 +263,6 @@
             syncOfflineHistory(session);
             setInterval(() => checkCurrentlyPlaying(session), 5000);
             checkCurrentlyPlaying(session);
-
-            // EVENTOS DE CONTROL DE MÚSICA
-            document.getElementById('np-prev')?.addEventListener('click', () => import('./js/tracking.js').then(m => m.spotifyControl('prev', session)));
-            document.getElementById('np-play')?.addEventListener('click', () => import('./js/tracking.js').then(m => m.spotifyControl('play', session)));
-            document.getElementById('np-next')?.addEventListener('click', () => import('./js/tracking.js').then(m => m.spotifyControl('next', session)));
         }
 
         bootstrap();
