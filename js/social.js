@@ -1,8 +1,10 @@
 import { supabaseClient } from './supabase.js';
+import { getValidToken } from './token_manager.js';
 
 let activeChallenges = [];
 let currentFilter = 'today';
 let currentUserData = null;
+let sharePickerOpen = false;
 
 // ── Sistema de Toast Notifications ──
 function showToast(message, type = 'success') {
@@ -46,6 +48,7 @@ export async function initSocial(currentUser) {
     document.getElementById('tab-search')?.addEventListener('click', () => switchTab('search', currentUser.id));
     document.getElementById('tab-requests')?.addEventListener('click', () => switchTab('requests', currentUser.id));
     document.getElementById('tab-manage')?.addEventListener('click', () => switchTab('manage', currentUser.id));
+    document.getElementById('tab-foryou')?.addEventListener('click', () => switchTab('foryou', currentUser.id));
 
     const searchInput = document.getElementById('friend-search-input');
     if (searchInput) {
@@ -133,9 +136,10 @@ function getAvatarHTML(url, name, sizeClass = "w-20 h-20", isRobot = false) {
 }
 
 function switchTab(tabName, userId) {
-    ['search', 'requests', 'manage'].forEach(t => {
+    ['search', 'requests', 'manage', 'foryou'].forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         const section = document.getElementById(`section-${t}`);
+        if (!btn || !section) return;
         if (t === tabName) {
             btn.classList.add('text-[#1DB954]', 'border-[#1DB954]', 'border-b-2');
             btn.classList.remove('text-neutral-500');
@@ -148,6 +152,7 @@ function switchTab(tabName, userId) {
     });
     if (tabName === 'requests') loadPendingRequests(userId);
     if (tabName === 'manage') loadActiveChallengesList(userId);
+    if (tabName === 'foryou') loadForYouTab(userId);
 }
 
 function updateFilterUI() {
@@ -256,6 +261,21 @@ async function renderArena(userId) {
 
             ${winHistoryHTML}
             
+            <button id="share-song-btn" class="mt-4 flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-neutral-400 hover:text-white hover:border-[#1DB954]/40 hover:bg-[#1DB954]/5 transition-all duration-200">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                Compartir canción
+            </button>
+
+            <!-- Panel de selección de canción (oculto por defecto) -->
+            <div id="share-picker" class="hidden w-full mt-4 bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl p-6 space-y-3">
+                <p class="text-[9px] font-black uppercase tracking-[0.3em] text-neutral-500 mb-4">¿Qué quieres compartir?</p>
+                <div id="share-tracks-list" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1"></div>
+                <div class="pt-3 border-t border-white/5">
+                    <input id="share-message-input" type="text" maxlength="120" placeholder="Mensaje opcional... (max 120 caracteres)" class="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-[11px] focus:border-[#1DB954]/50 outline-none text-white placeholder-neutral-600">
+                </div>
+                <button id="share-cancel-btn" class="w-full text-center text-[9px] font-black uppercase tracking-widest text-neutral-600 hover:text-white pt-1 transition-colors">Cancelar</button>
+            </div>
+
             ${(() => {
                 if (myTime > friendTime) return `
                     <div class="py-3 px-8 sm:py-4 sm:px-12 bg-[#1DB954]/10 rounded-2xl sm:rounded-3xl border border-[#1DB954]/30 backdrop-blur-md shadow-[0_0_20px_rgba(29,185,84,0.15)]">
@@ -278,6 +298,10 @@ async function renderArena(userId) {
             })()}
         </div>
     `;
+
+    // Inyectar lógica del botón compartir
+    document.getElementById('share-song-btn')?.addEventListener('click', () => openSharePicker(userId, opponentId));
+    document.getElementById('share-cancel-btn')?.addEventListener('click', closeSharePicker);
 }
 
 async function getWinHistoryOptimized(userId, friendId, challengeStart) {
@@ -430,4 +454,206 @@ function renderSearchResults(users, currentUserId) {
             showToast(`Solicitud enviada a ${u.display_name} ✅`);
         });
     });
+}
+
+// ══════════════════════════════════════════════════════════
+// SONG SHARES — Compartir canciones
+// ══════════════════════════════════════════════════════════
+
+/**
+ * Abre el picker mostrando la canción actual o recientes
+ */
+async function openSharePicker(userId, receiverId) {
+    if (sharePickerOpen) { closeSharePicker(); return; }
+    sharePickerOpen = true;
+
+    const picker = document.getElementById('share-picker');
+    const list   = document.getElementById('share-tracks-list');
+    if (!picker || !list) return;
+
+    picker.classList.remove('hidden');
+    list.innerHTML = '<p class="text-[9px] text-neutral-600 text-center py-4">Cargando...</p>';
+
+    const token = await getValidToken(userId);
+    if (!token) {
+        list.innerHTML = '<p class="text-[9px] text-red-400 text-center py-4">No se pudo obtener el token de Spotify</p>';
+        return;
+    }
+
+    let tracks = [];
+
+    // Intentar obtener la canción actual primero
+    try {
+        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 200) {
+            const data = await res.json();
+            if (data?.item) tracks.push({ ...data.item, _isCurrent: true });
+        }
+    } catch (_) {}
+
+    // Completar con recientes (hasta 5 únicas)
+    try {
+        const res = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=8', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const seen = new Set(tracks.map(t => t.id));
+            for (const item of (data.items || [])) {
+                if (!seen.has(item.track.id)) {
+                    seen.add(item.track.id);
+                    tracks.push(item.track);
+                    if (tracks.length >= 6) break;
+                }
+            }
+        }
+    } catch (_) {}
+
+    if (tracks.length === 0) {
+        list.innerHTML = '<p class="text-[9px] text-neutral-500 text-center py-4">No se encontraron canciones recientes</p>';
+        return;
+    }
+
+    list.innerHTML = '';
+    tracks.forEach(track => {
+        const art    = track.album?.images?.[1]?.url || track.album?.images?.[0]?.url || '';
+        const name   = track.name || 'Sin título';
+        const artist = track.artists?.map(a => a.name).join(', ') || '';
+        const spotUrl = track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`;
+        const isCurrent = track._isCurrent || false;
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-[#1DB954]/30 hover:bg-[#1DB954]/5 cursor-pointer transition-all group';
+        row.innerHTML = `
+            <img src="${art}" class="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg">
+            <div class="flex-1 min-w-0">
+                <p class="text-[11px] font-bold text-white truncate">${name}</p>
+                <p class="text-[9px] text-neutral-500 truncate">${artist}</p>
+            </div>
+            ${isCurrent ? '<span class="text-[7px] font-black uppercase tracking-widest text-[#1DB954] shrink-0">▶ Ahora</span>' : ''}
+            <svg class="w-4 h-4 text-neutral-700 group-hover:text-[#1DB954] shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        `;
+        row.addEventListener('click', () => confirmAndSendShare(userId, receiverId, {
+            track_id: track.id,
+            track_name: name,
+            artist_name: artist,
+            album_art_url: art,
+            spotify_url: spotUrl
+        }));
+        list.appendChild(row);
+    });
+}
+
+function closeSharePicker() {
+    sharePickerOpen = false;
+    document.getElementById('share-picker')?.classList.add('hidden');
+    const input = document.getElementById('share-message-input');
+    if (input) input.value = '';
+}
+
+/**
+ * Confirma y guarda el share en Supabase
+ */
+async function confirmAndSendShare(senderId, receiverId, trackData) {
+    const message = document.getElementById('share-message-input')?.value.trim() || null;
+
+    const { error } = await supabaseClient.from('song_shares').insert({
+        sender_id:     senderId,
+        receiver_id:   receiverId,
+        track_id:      trackData.track_id,
+        track_name:    trackData.track_name,
+        artist_name:   trackData.artist_name,
+        album_art_url: trackData.album_art_url,
+        spotify_url:   trackData.spotify_url,
+        message:       message,
+        seen:          false
+    });
+
+    if (error) {
+        showToast('No se pudo enviar. Inténtalo de nuevo', 'error');
+        console.error('song_shares insert error:', error);
+    } else {
+        closeSharePicker();
+        showToast('🎵 ¡Canción compartida!');
+    }
+}
+
+/**
+ * Carga la pestaña "Para ti" con las canciones recibidas
+ */
+export async function loadForYouTab(userId) {
+    const container = document.getElementById('foryou-list');
+    if (!container) return;
+
+    container.innerHTML = '<p class="text-[9px] text-neutral-600 text-center py-8">Cargando...</p>';
+
+    const { data: shares, error } = await supabaseClient
+        .from('song_shares')
+        .select('*, sender:sender_id (display_name, avatar_url)')
+        .eq('receiver_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+    if (error || !shares || shares.length === 0) {
+        container.innerHTML = '<p class="text-[9px] text-neutral-600 text-center py-8 uppercase tracking-[0.3em]">Aún no tienes canciones compartidas</p>';
+        return;
+    }
+
+    // Marcar todas como vistas
+    const unseenIds = shares.filter(s => !s.seen).map(s => s.id);
+    if (unseenIds.length > 0) {
+        await supabaseClient.from('song_shares').update({ seen: true }).in('id', unseenIds);
+        updateForYouBadge(userId);
+    }
+
+    container.innerHTML = '';
+    shares.forEach(share => {
+        const senderName = share.sender?.display_name || 'Alguien';
+        const art        = share.album_art_url || '';
+        const date       = new Date(share.created_at);
+        const dateStr    = date.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+
+        const card = document.createElement('div');
+        card.className = `flex items-center gap-4 p-4 rounded-3xl border transition-all ${
+            share.seen ? 'bg-white/3 border-white/5' : 'bg-[#1DB954]/5 border-[#1DB954]/20'
+        }`;
+        card.innerHTML = `
+            <img src="${art}" class="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-lg">
+            <div class="flex-1 min-w-0">
+                <p class="text-[10px] font-black text-white truncate">${share.track_name}</p>
+                <p class="text-[9px] text-neutral-500 truncate mb-1">${share.artist_name}</p>
+                ${share.message ? `<p class="text-[9px] text-[#1DB954]/80 italic truncate">"${share.message}"</p>` : ''}
+                <p class="text-[8px] text-neutral-700 uppercase tracking-widest mt-1">${senderName} · ${dateStr}</p>
+            </div>
+            <a href="${share.spotify_url}" target="_blank" rel="noopener noreferrer"
+               class="shrink-0 flex items-center gap-1.5 bg-[#1DB954] text-black text-[8px] font-black px-3 py-2 rounded-xl hover:bg-[#1ed760] transition-colors shadow-[0_0_12px_rgba(29,185,84,0.25)]">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.661 12.9c.42.18.6.78.3 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.62.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                Abrir
+            </a>
+        `;
+        container.appendChild(card);
+    });
+}
+
+/**
+ * Cuenta shares no vistos y actualiza el badge en la UI
+ */
+export async function updateForYouBadge(userId) {
+    const { count } = await supabaseClient
+        .from('song_shares')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', userId)
+        .eq('seen', false);
+
+    const badge = document.getElementById('foryou-badge');
+    if (!badge) return;
+
+    if (count && count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
 }

@@ -137,10 +137,14 @@
                 <h2 class="text-2xl font-black italic text-gradient">Amigos</h2>
                 <button id="close-friend-modal" class="bg-white/5 p-3 rounded-full hover:bg-white/10"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
-            <div class="flex gap-4 mb-8 border-b border-white/5 pb-2">
+            <div class="flex gap-4 mb-8 border-b border-white/5 pb-2 flex-wrap">
                 <button id="tab-search" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954] border-b-2 border-[#1DB954] pb-2">Buscar</button>
                 <button id="tab-requests" class="text-[10px] font-black uppercase tracking-widest text-neutral-500 pb-2">Solicitudes</button>
                 <button id="tab-manage" class="text-[10px] font-black uppercase tracking-widest text-neutral-500 pb-2">Gestionar</button>
+                <button id="tab-foryou" class="relative text-[10px] font-black uppercase tracking-widest text-neutral-500 pb-2">
+                    Para ti
+                    <span id="foryou-badge" class="hidden absolute -top-1.5 -right-3 min-w-[16px] h-4 bg-[#1DB954] text-black text-[7px] font-black rounded-full flex items-center justify-center px-1"></span>
+                </button>
             </div>
             <div id="section-search" class="space-y-4">
                 <div class="flex gap-2">
@@ -153,6 +157,7 @@
             </div>
             <div id="section-requests" class="hidden"><div id="friend-requests" class="space-y-3"></div></div>
             <div id="section-manage" class="hidden"><div id="active-duels-list" class="space-y-3"></div></div>
+            <div id="section-foryou" class="hidden"><div id="foryou-list" class="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-1"></div></div>
         </div>
     </div>
 
@@ -161,6 +166,7 @@
         import { supabaseClient } from './js/supabase.js';
         import { initSocial, loadSocialPage } from './js/social.js';
         import { getValidToken } from './js/token_manager.js';
+        import { updateForYouBadge } from './js/social.js';
 
         async function bootstrap() {
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -196,6 +202,7 @@
 
                 initSocial(user);
                 loadSocialPage(user.id);
+                updateForYouBadge(user.id);
                 
                 // Fondo dinámico
                 setInterval(() => updateBackground(user.id), 10000);
