@@ -162,6 +162,67 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================
+// FUSIONAR REPRODUCCIONES EN TIEMPO REAL A LOS TOPS
+// ============================================================
+async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken) {
+    if (!periodStats || !periodTrackDurations || Object.keys(periodTrackDurations).length === 0) return;
+
+    const topIds = Object.keys(periodTrackDurations)
+        .sort((a, b) => periodTrackDurations[b] - periodTrackDurations[a])
+        .slice(0, 10);
+
+    const freshTracks = (await Promise.all(
+        topIds.map(async id => {
+            let track = JSON.parse(localStorage.getItem('spotify_track_' + id));
+            if (!track && spotifyToken) {
+                try {
+                    const r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+                        headers: { Authorization: `Bearer ${spotifyToken}` }
+                    });
+                    if (r.ok) {
+                        track = await r.json();
+                        localStorage.setItem('spotify_track_' + id, JSON.stringify(track));
+                    }
+                } catch {}
+            }
+            return track;
+        })
+    )).filter(Boolean);
+
+    if (!periodStats.topTracks) periodStats.topTracks = [];
+    if (!periodStats.topArtists) periodStats.topArtists = [];
+
+    freshTracks.forEach(t => {
+        const dur = periodTrackDurations[t.id];
+        const exTrack = periodStats.topTracks.find(x => x.trackName === t.name && x.artistName === t.artists[0].name);
+        if (exTrack) {
+            exTrack.ms += dur;
+        } else {
+            periodStats.topTracks.push({
+                trackName: t.name,
+                artistName: t.artists[0].name,
+                ms: dur
+            });
+        }
+
+        t.artists.forEach(a => {
+            const exArtist = periodStats.topArtists.find(x => x.name === a.name);
+            if (exArtist) {
+                exArtist.ms += dur;
+            } else {
+                periodStats.topArtists.push({
+                    name: a.name,
+                    ms: dur
+                });
+            }
+        });
+    });
+
+    periodStats.topTracks = periodStats.topTracks.sort((a, b) => b.ms - a.ms).slice(0, 10);
+    periodStats.topArtists = periodStats.topArtists.sort((a, b) => b.ms - a.ms).slice(0, 10);
+}
+
+// ============================================================
 // LEER ESTADÍSTICAS GUARDADAS
 // ============================================================
 async function checkSavedStats(session) {
@@ -188,43 +249,95 @@ async function checkSavedStats(session) {
         // (independientemente del toggle)
         const { data: realtimeSessions } = await supabaseClient
             .from('listening_sessions')
-            .select('track_id, duration_ms')
+            .select('track_id, duration_ms, played_at')
             .eq('user_id', session.user.id);
 
-        let totalRealtimeMs = 0;
-        const trackDurations = {};
         if (realtimeSessions?.length > 0) {
+            const realtimeDaysGlobal = new Set();
+            const realtimeDaysByYear = {}; // { "2026": Set }
+            const realtimeDaysByMonth = {}; // { "2026-05": Set }
+
+            const realtimeMsByYear = {};
+            const realtimeMsByMonth = {};
+            let realtimeMsGlobal = 0;
+
+            const realtimeTracksGlobal = {};
+            const realtimeTracksByYear = {};
+            const realtimeTracksByMonth = {};
+
             realtimeSessions.forEach(s => {
-                trackDurations[s.track_id] = (trackDurations[s.track_id] || 0) + s.duration_ms;
-                totalRealtimeMs += s.duration_ms;
-            });
-            // Sumar horas al total siempre
-            const combinedMs = (stats.totalMsPlayed || stats.hours * 3600000) + totalRealtimeMs;
-            stats.hours = Math.floor(combinedMs / 3600000);
-            stats.totalMsPlayed = combinedMs;
-        }
+                const date = new Date(s.played_at);
+                const yr = date.getFullYear().toString();
+                const mo = (date.getMonth() + 1).toString().padStart(2, '0');
+                const moKey = `${yr}-${mo}`;
+                const dayKey = s.played_at.substring(0, 10);
 
-        // === OPCIONAL (toggle): fusionar top artistas/canciones con los de tiempo real ===
-        if (prefs.merge_history && totalRealtimeMs > 0 && spotifyToken) {
-            const topIds = Object.keys(trackDurations).sort((a,b) => trackDurations[b]-trackDurations[a]).slice(0,10);
-            const freshTracks = (await Promise.all(
-                topIds.map(async id => {
-                    const r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, { headers: { Authorization: `Bearer ${spotifyToken}` } });
-                    return r.ok ? r.json() : null;
-                })
-            )).filter(Boolean);
+                // Global
+                realtimeMsGlobal += s.duration_ms;
+                realtimeDaysGlobal.add(dayKey);
+                realtimeTracksGlobal[s.track_id] = (realtimeTracksGlobal[s.track_id] || 0) + s.duration_ms;
 
-            freshTracks.forEach(t => {
-                const dur = trackDurations[t.id];
-                const ex = stats.topTracks.find(x => x.trackName === t.name);
-                if (ex) ex.ms += dur; else stats.topTracks.push({ trackName: t.name, artistName: t.artists[0].name, ms: dur });
-                t.artists.forEach(a => {
-                    const ea = stats.topArtists.find(x => x.name === a.name);
-                    if (ea) ea.ms += dur; else stats.topArtists.push({ name: a.name, ms: dur });
-                });
+                // Year
+                realtimeMsByYear[yr] = (realtimeMsByYear[yr] || 0) + s.duration_ms;
+                if (!realtimeDaysByYear[yr]) realtimeDaysByYear[yr] = new Set();
+                realtimeDaysByYear[yr].add(dayKey);
+                if (!realtimeTracksByYear[yr]) realtimeTracksByYear[yr] = {};
+                realtimeTracksByYear[yr][s.track_id] = (realtimeTracksByYear[yr][s.track_id] || 0) + s.duration_ms;
+
+                // Month
+                realtimeMsByMonth[moKey] = (realtimeMsByMonth[moKey] || 0) + s.duration_ms;
+                if (!realtimeDaysByMonth[moKey]) realtimeDaysByMonth[moKey] = new Set();
+                realtimeDaysByMonth[moKey].add(dayKey);
+                if (!realtimeTracksByMonth[moKey]) realtimeTracksByMonth[moKey] = {};
+                realtimeTracksByMonth[moKey][s.track_id] = (realtimeTracksByMonth[moKey][s.track_id] || 0) + s.duration_ms;
             });
-            stats.topTracks  = stats.topTracks.sort((a,b)  => b.ms-a.ms).slice(0,10);
-            stats.topArtists = stats.topArtists.sort((a,b) => b.ms-a.ms).slice(0,10);
+
+            // Merge Global
+            stats.totalMsPlayed = (stats.totalMsPlayed || stats.hours * 3600000) + realtimeMsGlobal;
+            stats.hours = Math.floor(stats.totalMsPlayed / 3600000);
+            stats.totalDays = (stats.totalDays || 0) + realtimeDaysGlobal.size;
+
+            if (prefs.merge_history && spotifyToken) {
+                await mergePeriodTops(stats, realtimeTracksGlobal, spotifyToken);
+            }
+
+            // Merge Years
+            for (const [yr, ms] of Object.entries(realtimeMsByYear)) {
+                if (!stats.yearlyStats[yr]) {
+                    stats.yearlyStats[yr] = { hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, topArtists: [], topTracks: [], months: {} };
+                }
+                const yrStat = stats.yearlyStats[yr];
+                yrStat.totalMsPlayed += ms;
+                yrStat.hours = Math.floor(yrStat.totalMsPlayed / 3600000);
+                yrStat.totalDays = (yrStat.totalDays || 0) + realtimeDaysByYear[yr].size;
+
+                if (prefs.merge_history && spotifyToken) {
+                    await mergePeriodTops(yrStat, realtimeTracksByYear[yr], spotifyToken);
+                }
+            }
+
+            // Merge Months
+            for (const [moKey, ms] of Object.entries(realtimeMsByMonth)) {
+                const [yr, mo] = moKey.split('-');
+                if (!stats.yearlyStats[yr]) {
+                    stats.yearlyStats[yr] = { hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, topArtists: [], topTracks: [], months: {} };
+                }
+                if (!stats.yearlyStats[yr].months) stats.yearlyStats[yr].months = {};
+                if (!stats.yearlyStats[yr].months[mo]) {
+                    stats.yearlyStats[yr].months[mo] = { hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, topArtists: [], topTracks: [] };
+                }
+                const moStat = stats.yearlyStats[yr].months[mo];
+                moStat.totalMsPlayed += ms;
+                moStat.hours = Math.floor(moStat.totalMsPlayed / 3600000);
+                moStat.totalDays = (moStat.totalDays || 0) + realtimeDaysByMonth[moKey].size;
+
+                if (prefs.merge_history && spotifyToken) {
+                    await mergePeriodTops(moStat, realtimeTracksByMonth[moKey], spotifyToken);
+                }
+            }
+
+            // Refresh availableYears
+            stats.availableYears = Object.keys(stats.yearlyStats || {}).sort().reverse();
         }
 
         globalStats = stats;
@@ -293,9 +406,16 @@ async function processFiles(files, _closureSession) {
         const track  = item.master_metadata_track_name || item.trackName;
         const uri    = item.spotify_track_uri || null;
 
-        let year = null, dayKey = null;
-        if (item.ts)      { year = item.ts.substring(0, 4);      dayKey = item.ts.substring(0, 10); }
-        else if (item.endTime) { year = item.endTime.substring(0, 4); dayKey = item.endTime.substring(0, 10); }
+        let year = null, month = null, dayKey = null;
+        if (item.ts) {
+            year = item.ts.substring(0, 4);
+            month = item.ts.substring(5, 7);
+            dayKey = item.ts.substring(0, 10);
+        } else if (item.endTime) {
+            year = item.endTime.substring(0, 4);
+            month = item.endTime.substring(5, 7);
+            dayKey = item.endTime.substring(0, 10);
+        }
         if (dayKey) activeDays.add(dayKey);
 
         if (ms < 30000 || !artist || !track) return;
@@ -308,25 +428,66 @@ async function processFiles(files, _closureSession) {
         tracksCount[key].ms += ms;
 
         if (year) {
-            if (!yearlyData[year]) yearlyData[year] = { totalMs: 0, artistsCount: {}, tracksCount: {} };
+            if (!yearlyData[year]) {
+                yearlyData[year] = { 
+                    totalMs: 0, 
+                    artistsCount: {}, 
+                    tracksCount: {}, 
+                    activeDays: new Set(),
+                    months: {} 
+                };
+            }
             yearlyData[year].totalMs += ms;
             yearlyData[year].artistsCount[artist] = (yearlyData[year].artistsCount[artist] || 0) + ms;
             if (!yearlyData[year].tracksCount[key]) yearlyData[year].tracksCount[key] = { ms: 0, uri, trackName: track, artistName: artist };
             yearlyData[year].tracksCount[key].ms += ms;
+            if (dayKey) yearlyData[year].activeDays.add(dayKey);
+
+            if (month) {
+                if (!yearlyData[year].months[month]) {
+                    yearlyData[year].months[month] = { 
+                        totalMs: 0, 
+                        artistsCount: {}, 
+                        tracksCount: {}, 
+                        activeDays: new Set() 
+                    };
+                }
+                const mData = yearlyData[year].months[month];
+                mData.totalMs += ms;
+                mData.artistsCount[artist] = (mData.artistsCount[artist] || 0) + ms;
+                if (!mData.tracksCount[key]) mData.tracksCount[key] = { ms: 0, uri, trackName: track, artistName: artist };
+                mData.tracksCount[key].ms += ms;
+                if (dayKey) mData.activeDays.add(dayKey);
+            }
         }
     });
 
-    setProgress(progressFill, progressText, 80, 'Construyendo estadísticas por año...');
+    setProgress(progressFill, progressText, 80, 'Construyendo estadísticas por año y mes...');
 
     const yearlyStats = {};
     Object.entries(yearlyData).forEach(([yr, yd]) => {
+        const months = {};
+        Object.entries(yd.months).forEach(([mo, md]) => {
+            months[mo] = {
+                hours: Math.floor(md.totalMs / 3600000),
+                totalMsPlayed: md.totalMs,
+                totalDays: md.activeDays.size,
+                totalUniqueArtists: Object.keys(md.artistsCount).length,
+                totalUniqueTracks:  Object.keys(md.tracksCount).length,
+                topArtists: Object.entries(md.artistsCount).sort((a,b)=>b[1]-a[1]).slice(0,10).map(x=>({ name:x[0], ms:x[1] })),
+                topTracks:  Object.values(md.tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10)
+            };
+        });
+
         yearlyStats[yr] = {
             hours: Math.floor(yd.totalMs / 3600000),
             totalMsPlayed: yd.totalMs,
+            totalDays: yd.activeDays.size,
             totalUniqueArtists: Object.keys(yd.artistsCount).length,
             totalUniqueTracks:  Object.keys(yd.tracksCount).length,
             topArtists: Object.entries(yd.artistsCount).sort((a,b)=>b[1]-a[1]).slice(0,10).map(x=>({ name:x[0], ms:x[1] })),
-            topTracks:  Object.values(yd.tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10)
+            topTracks:  Object.values(yd.tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10),
+            months
         };
     });
 
@@ -385,13 +546,27 @@ async function processFiles(files, _closureSession) {
 
 function setProgress(fill, text, pct, label) {
     if (fill) fill.style.width = `${pct}%`;
-    if (text) text.textContent = label;
-}
-
-// ============================================================
-// TABS DE AÑO
+   // ============================================================
+// TABS DE AÑO Y MES
 // ============================================================
 let activeYear = 'all';
+let activeMonth = 'all';
+
+const MONTH_SHORT_NAMES = {
+    'all': 'Todos los meses',
+    '01': 'Ene',
+    '02': 'Feb',
+    '03': 'Mar',
+    '04': 'Abr',
+    '05': 'May',
+    '06': 'Jun',
+    '07': 'Jul',
+    '08': 'Ago',
+    '09': 'Sep',
+    '10': 'Oct',
+    '11': 'Nov',
+    '12': 'Dic'
+};
 
 function renderYearTabs(stats, token) {
     const container = document.getElementById('year-filter');
@@ -406,10 +581,74 @@ function renderYearTabs(stats, token) {
         btn.textContent = yr === 'all' ? 'Todos los años' : yr;
         btn.addEventListener('click', () => {
             activeYear = yr;
-            document.querySelectorAll('.year-tab').forEach(b => b.classList.remove('active'));
+            activeMonth = 'all'; // Reset active month on year change
+            document.querySelectorAll('#year-filter .year-tab').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            
             const displayStats = yr === 'all' ? stats : stats.yearlyStats[yr];
-            if (displayStats) renderStats(displayStats, token, yr);
+            if (displayStats) {
+                renderStats(displayStats, token, yr);
+            }
+            renderMonthTabs(stats, token, yr);
+        });
+        container.appendChild(btn);
+    });
+
+    // Initial render of month filter (will hide if year is 'all')
+    renderMonthTabs(stats, token, activeYear);
+}
+
+function renderMonthTabs(stats, token, year) {
+    const container = document.getElementById('month-filter');
+    if (!container) return;
+
+    if (year === 'all') {
+        container.classList.add('hidden');
+        return;
+    }
+
+    const yrStats = stats.yearlyStats?.[year];
+    const availableMonths = new Set();
+
+    if (yrStats?.months) {
+        Object.keys(yrStats.months).forEach(m => availableMonths.add(m));
+    }
+
+    if (availableMonths.size === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    container.innerHTML = '';
+
+    // Render "Todos los meses"
+    const allBtn = document.createElement('button');
+    allBtn.className = 'year-tab' + (activeMonth === 'all' ? ' active' : '');
+    allBtn.textContent = 'Todos los meses';
+    allBtn.addEventListener('click', () => {
+        activeMonth = 'all';
+        container.querySelectorAll('#month-filter .year-tab').forEach(b => b.classList.remove('active'));
+        allBtn.classList.add('active');
+        renderStats(yrStats, token, year);
+    });
+    container.appendChild(allBtn);
+
+    // Render months chronologically
+    const sortedMonths = Array.from(availableMonths).sort();
+    sortedMonths.forEach(mo => {
+        const btn = document.createElement('button');
+        btn.className = 'year-tab' + (mo === activeMonth ? ' active' : '');
+        btn.textContent = MONTH_SHORT_NAMES[mo] || mo;
+        btn.addEventListener('click', () => {
+            activeMonth = mo;
+            container.querySelectorAll('#month-filter .year-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const monthStats = yrStats.months?.[mo];
+            if (monthStats) {
+                renderStats(monthStats, token, year);
+            }
         });
         container.appendChild(btn);
     });
