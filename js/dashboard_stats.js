@@ -1,8 +1,9 @@
 import { supabaseClient } from './supabase.js';
 import { getValidToken } from './token_manager.js';
 
-let dailyTracks  = [];
-let weeklyTracks = [];
+let dailyTracks   = [];
+let weeklyTracks  = [];
+let monthlyTracks = [];
 let currentFilter = 'total';
 
 // Se inyecta desde dashboard.html tras cargar la sesión
@@ -74,14 +75,18 @@ async function loadTotalTime(userId) {
 async function loadTops(userId, session) {
     const today = new Date(); today.setHours(0,0,0,0);
     const week  = new Date(); week.setDate(week.getDate() - 7);
-    const [todayData, weekData] = await Promise.all([
+    const month = new Date(); month.setDate(month.getDate() - 30);
+    const [todayData, weekData, monthData] = await Promise.all([
         getTopTracks(userId, today.toISOString(), session),
-        getTopTracks(userId, week.toISOString(), session)
+        getTopTracks(userId, week.toISOString(), session),
+        getTopTracks(userId, month.toISOString(), session)
     ]);
-    dailyTracks  = todayData;
-    weeklyTracks = weekData;
+    dailyTracks   = todayData;
+    weeklyTracks  = weekData;
+    monthlyTracks = monthData;
     renderTopCard('card-top-today', todayData[0]);
     renderTopCard('card-top-week',  weekData[0]);
+    renderTopCard('card-top-month', monthData[0]);
 }
 
 async function getTopTracks(userId, sinceIso, session) {
@@ -110,7 +115,9 @@ async function getTopTracks(userId, sinceIso, session) {
 function renderTopCard(elementId, track) {
     const el = document.getElementById(elementId);
     if (!el) return;
-    const titleText = elementId === 'card-top-today' ? 'Hoy' : 'Semanal';
+    let titleText = 'Hoy';
+    if (elementId === 'card-top-week') titleText = 'Semanal';
+    else if (elementId === 'card-top-month') titleText = 'Mensual';
     
     if (!track) {
         el.innerHTML = `<h3 class="text-[8px] font-black uppercase text-white/40 mb-1 tracking-widest absolute top-5 left-5 z-20">${titleText}</h3><p class="text-[9px] text-neutral-600 italic relative z-10">Sin datos.</p>`;
@@ -154,6 +161,7 @@ function setupClickHandlers(userId) {
 
     document.getElementById('card-top-today')?.addEventListener('click', () => showListModal('Top de Hoy',     dailyTracks));
     document.getElementById('card-top-week')?.addEventListener('click',  () => showListModal('Top Semanal', weeklyTracks));
+    document.getElementById('card-top-month')?.addEventListener('click', () => showListModal('Top Mensual', monthlyTracks));
 }
 
 // ── Modal Top 5 con swipe-to-share ──────────────────────────────────────────
