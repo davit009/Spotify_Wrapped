@@ -546,6 +546,8 @@ async function processFiles(files, _closureSession) {
 
 function setProgress(fill, text, pct, label) {
     if (fill) fill.style.width = `${pct}%`;
+    if (text) text.textContent = label;
+}
    // ============================================================
 // TABS DE AÑO Y MES
 // ============================================================
