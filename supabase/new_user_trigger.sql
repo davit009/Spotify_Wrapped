@@ -33,7 +33,7 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', ''),
     COALESCE(NEW.raw_user_meta_data->>'provider_token', ''),
     NOW(),
-    '{"merge_history": false}'::jsonb
+    '{"merge_history": true}'::jsonb
   )
   ON CONFLICT (id) DO NOTHING;
 
@@ -79,7 +79,7 @@ SELECT
   COALESCE(au.raw_user_meta_data->>'full_name', au.raw_user_meta_data->>'name', 'Usuario'),
   COALESCE(au.raw_user_meta_data->>'avatar_url', au.raw_user_meta_data->>'picture', ''),
   au.created_at,
-  '{"merge_history": false}'::jsonb
+  '{"merge_history": true}'::jsonb
 FROM auth.users au
 WHERE NOT EXISTS (
   SELECT 1 FROM public.users pu WHERE pu.id = au.id

@@ -259,9 +259,15 @@
                 }).eq('id', session.user.id);
             }
 
+            await syncOfflineHistory(session);
             await initDashboard(session);
-            syncOfflineHistory(session);
-            setInterval(() => checkCurrentlyPlaying(session), 5000);
+            setInterval(async () => {
+                const state = await checkCurrentlyPlaying(session);
+                if (state && state.trackChanged) {
+                    await syncOfflineHistory(session);
+                    await initDashboard(session);
+                }
+            }, 5000);
             checkCurrentlyPlaying(session);
         }
 

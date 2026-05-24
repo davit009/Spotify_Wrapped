@@ -6,7 +6,7 @@ let lastTrackId = null;
 export async function checkCurrentlyPlaying(session) {
     try {
         const token = await getValidToken(session.user.id);
-        if (!token) return;
+        if (!token) return { active: false, trackChanged: false };
 
         const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -26,12 +26,13 @@ export async function checkCurrentlyPlaying(session) {
                     updateDynamicBackground(recentData.items[0].track.album.images[0].url);
                 }
             }
-            return;
+            return { active: false, trackChanged: false };
         }
 
         const data = await response.json();
         if (data && data.item) {
             const track = data.item;
+            let trackChanged = false;
             if (npCard) {
                 npCard.classList.remove('hidden');
                 document.getElementById('np-title').textContent = track.name;
@@ -55,14 +56,19 @@ export async function checkCurrentlyPlaying(session) {
 
                 if (track.id !== lastTrackId) {
                     lastTrackId = track.id;
+                    trackChanged = true;
                     updateDynamicBackground(track.album.images[0].url);
-                    saveListeningSession(session.user.id, track, data.timestamp);
                 }
             }
-        } else if (npCard) {
-            npCard.classList.add('hidden');
+            return { active: true, trackChanged, track };
+        } else {
+            if (npCard) npCard.classList.add('hidden');
+            return { active: false, trackChanged: false };
         }
-    } catch (error) { console.error("Error en checkCurrentlyPlaying:", error); }
+    } catch (error) { 
+        console.error("Error en checkCurrentlyPlaying:", error); 
+        return { active: false, trackChanged: false };
+    }
 }
 
 /**

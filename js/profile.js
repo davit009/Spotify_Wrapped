@@ -354,7 +354,10 @@ async function processFiles(files, _closureSession) {
 
     const { error: saveError } = await supabaseClient
         .from('users')
-        .update({ historical_stats: statsToSave })
+        .update({ 
+            historical_stats: statsToSave,
+            preferences: { merge_history: true }
+        })
         .eq('id', session.user.id);
 
     if (saveError) {
