@@ -38,7 +38,7 @@ export async function initDashboard(session) {
 async function loadTotalTime(userId) {
     const { data: user } = await supabaseClient.from('users').select('historical_stats, preferences').eq('id', userId).single();
     
-    let query = supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId);
+    let query = supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId).limit(10000);
     
     const now = new Date();
     if (currentFilter === 'today') {
@@ -90,7 +90,13 @@ async function loadTops(userId, session) {
 }
 
 async function getTopTracks(userId, sinceIso, session) {
-    const { data } = await supabaseClient.from('listening_sessions').select('track_id').eq('user_id', userId).gte('played_at', sinceIso);
+    const { data } = await supabaseClient
+        .from('listening_sessions')
+        .select('track_id')
+        .eq('user_id', userId)
+        .gte('played_at', sinceIso)
+        .order('played_at', { ascending: false })
+        .limit(10000);
     if (!data || data.length === 0) return [];
     const counts = {};
     data.forEach(s => counts[s.track_id] = (counts[s.track_id] || 0) + 1);
