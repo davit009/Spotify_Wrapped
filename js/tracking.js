@@ -143,65 +143,35 @@ function updateDynamicBackground(imgUrl) {
     if (bg) { bg.style.backgroundImage = `url(${imgUrl})`; bg.classList.add('visible'); }
 }
 
-async function saveListeningSession(userId, track, playedAt) {
-    try {
-        const playedAtIso = new Date(playedAt).toISOString();
-
-        // Verificar si ya existe esta sesión antes del upsert
-        // para saber si es una inserción nueva o un duplicado.
-        const { data: existing } = await supabaseClient
-            .from('listening_sessions')
-            .select('user_id')
-            .eq('user_id', userId)
-            .eq('played_at', playedAtIso)
-            .maybeSingle();
-
-        await supabaseClient.from('listening_sessions').upsert({
-            user_id: userId,
-            track_id: track.id,
-            duration_ms: track.duration_ms,
-            played_at: playedAtIso
-        }, { onConflict: 'user_id,played_at' });
-
-        // Si es una sesión nueva (no duplicada), incrementar el acumulado.
-        // El trigger SQL en Supabase hace esto automáticamente; este bloque
-        // es un respaldo por si el trigger no está activo.
-        if (!existing) {
-            await supabaseClient.rpc('increment_user_cumulative_ms', {
-                p_user_id: userId,
-                p_ms: track.duration_ms
-            }).then(({ error }) => {
-                // Si falla la RPC (no existe aún), hacemos read-then-write
-                if (error) {
-                    return supabaseClient
-                        .from('users')
-                        .select('cumulative_ms_played')
-                        .eq('id', userId)
-                        .single()
-                        .then(({ data }) => {
-                            const current = data?.cumulative_ms_played || 0;
-                            return supabaseClient
-                                .from('users')
-                                .update({ cumulative_ms_played: current + track.duration_ms })
-                                .eq('id', userId);
-                        });
-                }
-            });
-        }
-    } catch (e) { console.error("Error guardando sesión:", e); }
-}
-
 export async function syncOfflineHistory(session) {
+    // FIX PERF #1: Un único batch upsert en lugar de 50 roundtrips secuenciales.
+    // FIX PERF #4: Sin SELECT previo — el trigger SQL maneja el acumulado;
+    //              los duplicados los descarta el onConflict del upsert.
     try {
         const token = await getValidToken(session.user.id);
+        if (!token) return;
+
         const response = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (!response.ok) return;
+
         const data = await response.json();
-        if (data.items) {
-            for (const item of data.items) {
-                await saveListeningSession(session.user.id, item.track, item.played_at);
-            }
-        }
+        if (!data.items?.length) return;
+
+        // Construir el batch completo de filas
+        const rows = data.items.map(item => ({
+            user_id:     session.user.id,
+            track_id:    item.track.id,
+            duration_ms: item.track.duration_ms,
+            played_at:   new Date(item.played_at).toISOString()
+        }));
+
+        // Un solo roundtrip a Supabase — el trigger SQL suma el acumulado
+        // solo para las filas realmente nuevas (INSERT), no para duplicados (UPDATE).
+        await supabaseClient
+            .from('listening_sessions')
+            .upsert(rows, { onConflict: 'user_id,played_at', ignoreDuplicates: true });
+
     } catch (e) { console.error("Error en syncOfflineHistory:", e); }
 }

@@ -242,7 +242,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
         import { supabaseClient } from './js/supabase.js';
-        import { initDashboard } from './js/dashboard_stats.js';
+        import { initDashboard, loadRecentHistory, loadTotalTime } from './js/dashboard_stats.js';
         import { checkCurrentlyPlaying, syncOfflineHistory } from './js/tracking.js';
 
         async function bootstrap() {
@@ -265,13 +265,22 @@
                 }).eq('id', session.user.id);
             }
 
-            await syncOfflineHistory(session);
+        // FIX PERF #5a: Lanzar sync en background SIN await
+            // El dashboard no espera a que terminen los 50 upserts para mostrarse.
+            syncOfflineHistory(session).catch(console.error);
+
+            // Cargar dashboard sin esperar al sync
             await initDashboard(session);
+
             setInterval(async () => {
                 const state = await checkCurrentlyPlaying(session);
+                // FIX PERF #5b: Cuando cambia la canción, solo refrescar
+                // historial reciente y tiempo total — NO el dashboard completo.
+                // Evita re-ejecutar 3 queries a DB + 15 llamadas a Spotify.
                 if (state && state.trackChanged) {
-                    await syncOfflineHistory(session);
-                    await initDashboard(session);
+                    syncOfflineHistory(session).catch(console.error);
+                    loadRecentHistory(session.user.id, session);
+                    loadTotalTime(session.user.id);
                 }
             }, 5000);
             checkCurrentlyPlaying(session);

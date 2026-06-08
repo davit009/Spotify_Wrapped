@@ -35,7 +35,7 @@ export async function initDashboard(session) {
     setupClickHandlers(userId);
 }
 
-async function loadTotalTime(userId) {
+export async function loadTotalTime(userId) {
     // Leer siempre el usuario completo para tener cumulative_ms_played, historical_stats y preferences
     const { data: user } = await supabaseClient
         .from('users')
@@ -119,25 +119,35 @@ async function getTopTracks(userId, sinceIso, session) {
         .order('played_at', { ascending: false })
         .limit(10000);
     if (!data || data.length === 0) return [];
+
     const counts = {};
     data.forEach(s => counts[s.track_id] = (counts[s.track_id] || 0) + 1);
     const sortedIds = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
-    const tracks = [];
-    const token  = await getValidToken(userId);
+    const token = await getValidToken(userId);
 
-    for (const id of sortedIds) {
-        let track = JSON.parse(localStorage.getItem('spotify_track_' + id));
-        if (!track && token) {
-            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (res.ok) {
-                track = await res.json();
-                localStorage.setItem('spotify_track_' + id, JSON.stringify(track));
+    // FIX PERF #2: Paralelizar todas las llamadas a Spotify con Promise.all
+    // En lugar de awaitar una a una (hasta 5 roundtrips secuenciales)
+    const tracks = (await Promise.all(
+        sortedIds.map(async id => {
+            let track = JSON.parse(localStorage.getItem('spotify_track_' + id));
+            if (!track && token) {
+                try {
+                    const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        track = await res.json();
+                        localStorage.setItem('spotify_track_' + id, JSON.stringify(track));
+                    }
+                } catch {}
             }
-        }
-        if (track) tracks.push({ ...track, play_count: counts[id] });
-    }
+            return track ? { ...track, play_count: counts[id] } : null;
+        })
+    )).filter(Boolean);
+
     return tracks;
 }
+
 
 function renderTopCard(elementId, track) {
     const el = document.getElementById(elementId);
@@ -247,17 +257,28 @@ export async function loadRecentHistory(userId, session) {
         });
     }
 
-    for (const sessionItem of grouped) {
-        let track = JSON.parse(localStorage.getItem('spotify_track_' + sessionItem.track_id));
-        if (!track && token) {
-            const res = await fetch(`https://api.spotify.com/v1/tracks/${sessionItem.track_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (res.ok) {
-                track = await res.json();
-                localStorage.setItem('spotify_track_' + sessionItem.track_id, JSON.stringify(track));
+    // FIX PERF #3: Paralelizar todas las llamadas a Spotify con Promise.all
+    // en lugar de un for...of secuencial (hasta 5 roundtrips uno tras otro)
+    const resolvedTracks = await Promise.all(
+        grouped.map(async sessionItem => {
+            let track = JSON.parse(localStorage.getItem('spotify_track_' + sessionItem.track_id));
+            if (!track && token) {
+                try {
+                    const res = await fetch(`https://api.spotify.com/v1/tracks/${sessionItem.track_id}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        track = await res.json();
+                        localStorage.setItem('spotify_track_' + sessionItem.track_id, JSON.stringify(track));
+                    }
+                } catch {}
             }
-        }
-        if (!track) continue;
+            return track ? { sessionItem, track } : null;
+        })
+    );
 
+    // Renderizar todos de una vez
+    resolvedTracks.filter(Boolean).forEach(({ sessionItem, track }) => {
         const timeStr = new Date(sessionItem.played_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const row = buildSwipeRow({
             name:   track.name,
@@ -269,8 +290,9 @@ export async function loadRecentHistory(userId, session) {
             trackData: buildTrackPayload(track)
         });
         list.appendChild(row);
-    }
+    });
 }
+
 
 // ── Swipe row builder ─────────────────────────────────────────────────────────
 
