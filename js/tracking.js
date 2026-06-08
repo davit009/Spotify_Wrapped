@@ -145,12 +145,49 @@ function updateDynamicBackground(imgUrl) {
 
 async function saveListeningSession(userId, track, playedAt) {
     try {
+        const playedAtIso = new Date(playedAt).toISOString();
+
+        // Verificar si ya existe esta sesión antes del upsert
+        // para saber si es una inserción nueva o un duplicado.
+        const { data: existing } = await supabaseClient
+            .from('listening_sessions')
+            .select('user_id')
+            .eq('user_id', userId)
+            .eq('played_at', playedAtIso)
+            .maybeSingle();
+
         await supabaseClient.from('listening_sessions').upsert({
             user_id: userId,
             track_id: track.id,
             duration_ms: track.duration_ms,
-            played_at: new Date(playedAt).toISOString()
+            played_at: playedAtIso
         }, { onConflict: 'user_id,played_at' });
+
+        // Si es una sesión nueva (no duplicada), incrementar el acumulado.
+        // El trigger SQL en Supabase hace esto automáticamente; este bloque
+        // es un respaldo por si el trigger no está activo.
+        if (!existing) {
+            await supabaseClient.rpc('increment_user_cumulative_ms', {
+                p_user_id: userId,
+                p_ms: track.duration_ms
+            }).then(({ error }) => {
+                // Si falla la RPC (no existe aún), hacemos read-then-write
+                if (error) {
+                    return supabaseClient
+                        .from('users')
+                        .select('cumulative_ms_played')
+                        .eq('id', userId)
+                        .single()
+                        .then(({ data }) => {
+                            const current = data?.cumulative_ms_played || 0;
+                            return supabaseClient
+                                .from('users')
+                                .update({ cumulative_ms_played: current + track.duration_ms })
+                                .eq('id', userId);
+                        });
+                }
+            });
+        }
     } catch (e) { console.error("Error guardando sesión:", e); }
 }
 

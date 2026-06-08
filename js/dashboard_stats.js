@@ -36,35 +36,56 @@ export async function initDashboard(session) {
 }
 
 async function loadTotalTime(userId) {
-    const { data: user } = await supabaseClient.from('users').select('historical_stats, preferences').eq('id', userId).single();
-    
-    let query = supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId).limit(10000);
-    
-    const now = new Date();
-    if (currentFilter === 'today') {
-        now.setHours(0,0,0,0);
-        query = query.gte('played_at', now.toISOString());
-    } else if (currentFilter === 'week') {
-        now.setDate(now.getDate() - 7);
-        query = query.gte('played_at', now.toISOString());
-    } else if (currentFilter === 'month') {
-        now.setDate(now.getDate() - 30);
-        query = query.gte('played_at', now.toISOString());
+    // Leer siempre el usuario completo para tener cumulative_ms_played, historical_stats y preferences
+    const { data: user } = await supabaseClient
+        .from('users')
+        .select('historical_stats, preferences, cumulative_ms_played')
+        .eq('id', userId)
+        .single();
+
+    let totalMs = 0;
+
+    if (currentFilter === 'total') {
+        // Para el total usamos el campo acumulado en la BD, que se actualiza
+        // automáticamente vía trigger en cada INSERT a listening_sessions.
+        // Esto garantiza que el total real no se pierda aunque la API de Spotify
+        // solo devuelva las últimas 50 canciones.
+        totalMs = user?.cumulative_ms_played || 0;
+
+        // Sumar historial importado (Spotify Wrapped JSON) si el usuario lo tiene activo
+        if (user?.preferences?.merge_history && user?.historical_stats) {
+            totalMs += user.historical_stats.totalMsPlayed || 0;
+        }
+    } else {
+        // Para períodos cortos (hoy / semana / mes) seguimos consultando
+        // listening_sessions con filtro de fecha — esos datos son suficientemente completos.
+        let query = supabaseClient
+            .from('listening_sessions')
+            .select('duration_ms')
+            .eq('user_id', userId)
+            .limit(10000);
+
+        const now = new Date();
+        if (currentFilter === 'today') {
+            now.setHours(0, 0, 0, 0);
+            query = query.gte('played_at', now.toISOString());
+        } else if (currentFilter === 'week') {
+            now.setDate(now.getDate() - 7);
+            query = query.gte('played_at', now.toISOString());
+        } else if (currentFilter === 'month') {
+            now.setDate(now.getDate() - 30);
+            query = query.gte('played_at', now.toISOString());
+        }
+
+        const { data: sessions } = await query;
+        totalMs = (sessions || []).reduce((acc, s) => acc + s.duration_ms, 0);
     }
 
-    const { data: realtime } = await query;
-    
-    let totalMs = (realtime || []).reduce((acc, s) => acc + s.duration_ms, 0);
-    
-    if (currentFilter === 'total' && user?.preferences?.merge_history && user?.historical_stats) {
-        totalMs += user.historical_stats.totalMsPlayed || 0;
-    }
-    
     const hours   = Math.floor(totalMs / 3600000);
     const minutes = Math.floor((totalMs % 3600000) / 60000);
     const el = document.getElementById('stats-total-hours');
     if (el) el.innerHTML = `${hours}<span class="text-xl text-white/50 ml-1 not-italic">h</span> ${minutes}<span class="text-xl text-white/50 ml-1 not-italic">m</span>`;
-    
+
     const titleEl = document.getElementById('stats-title');
     if (titleEl) {
         const titles = { today: 'Tiempo Hoy', week: 'Tiempo Semanal', month: 'Tiempo Mensual', total: 'Tiempo Total' };
