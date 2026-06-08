@@ -113,7 +113,7 @@ async function loadTops(userId, session) {
 async function getTopTracks(userId, sinceIso, session) {
     const { data } = await supabaseClient
         .from('listening_sessions')
-        .select('track_id')
+        .select('track_id, track_name, artist_name, album_art_url')
         .eq('user_id', userId)
         .gte('played_at', sinceIso)
         .order('played_at', { ascending: false })
@@ -121,7 +121,17 @@ async function getTopTracks(userId, sinceIso, session) {
     if (!data || data.length === 0) return [];
 
     const counts = {};
-    data.forEach(s => counts[s.track_id] = (counts[s.track_id] || 0) + 1);
+    const metadata = {};
+    data.forEach(s => {
+        counts[s.track_id] = (counts[s.track_id] || 0) + 1;
+        if (s.track_name && s.artist_name && !metadata[s.track_id]) {
+            metadata[s.track_id] = {
+                name: s.track_name,
+                artist: s.artist_name,
+                art: s.album_art_url
+            };
+        }
+    });
     const sortedIds = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
     const token = await getValidToken(userId);
 
@@ -129,6 +139,17 @@ async function getTopTracks(userId, sinceIso, session) {
     // En lugar de awaitar una a una (hasta 5 roundtrips secuenciales)
     const tracks = (await Promise.all(
         sortedIds.map(async id => {
+            // Usar metadatos cacheados en BD si están disponibles
+            if (metadata[id]) {
+                return {
+                    id,
+                    name: metadata[id].name,
+                    artists: [{ name: metadata[id].artist }],
+                    album: { images: [{ url: metadata[id].art }] },
+                    external_urls: { spotify: `https://open.spotify.com/track/${id}` },
+                    play_count: counts[id]
+                };
+            }
             let track = JSON.parse(localStorage.getItem('spotify_track_' + id));
             if (!track && token) {
                 try {
@@ -261,6 +282,19 @@ export async function loadRecentHistory(userId, session) {
     // en lugar de un for...of secuencial (hasta 5 roundtrips uno tras otro)
     const resolvedTracks = await Promise.all(
         grouped.map(async sessionItem => {
+            // Usar metadatos cacheados en BD si están disponibles
+            if (sessionItem.track_name && sessionItem.artist_name) {
+                return {
+                    sessionItem,
+                    track: {
+                        id: sessionItem.track_id,
+                        name: sessionItem.track_name,
+                        artists: [{ name: sessionItem.artist_name }],
+                        album: { images: [{ url: sessionItem.album_art_url }] },
+                        external_urls: { spotify: `https://open.spotify.com/track/${sessionItem.track_id}` }
+                    }
+                };
+            }
             let track = JSON.parse(localStorage.getItem('spotify_track_' + sessionItem.track_id));
             if (!track && token) {
                 try {

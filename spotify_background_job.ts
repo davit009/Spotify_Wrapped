@@ -69,7 +69,10 @@ serve(async (req: Request) => {
                 user_id: user.id,
                 track_id: item.track.id,
                 duration_ms: item.track.duration_ms,
-                played_at: item.played_at // La fecha exacta milimétrica en que la escuchó
+                played_at: item.played_at, // La fecha exacta milimétrica en que la escuchó
+                track_name: item.track.name || null,
+                artist_name: item.track.artists?.map((a: any) => a.name).join(', ') || null,
+                album_art_url: item.track.album?.images?.[0]?.url || null
             }));
 
             if (sessionsToInsert.length === 0) continue;

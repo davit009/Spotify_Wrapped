@@ -129,11 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     .update({ historical_stats: null })
                     .eq('id', session.user.id);
                 closeSettingsModal();
-                document.getElementById('results').classList.add('hidden');
-                document.getElementById('upload-section').classList.remove('hidden');
-                document.getElementById('header-desc').classList.remove('hidden');
-                document.getElementById('year-filter').classList.add('hidden');
-                globalStats = null;
+                checkSavedStats(session); // Recargar desde base de datos en tiempo real
             });
 
             // Dropzone
@@ -164,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 // FUSIONAR REPRODUCCIONES EN TIEMPO REAL A LOS TOPS
 // ============================================================
-async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken) {
+async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken, realtimeTracksMetadata = {}) {
     if (!periodStats || !periodTrackDurations || Object.keys(periodTrackDurations).length === 0) return;
 
     const topIds = Object.keys(periodTrackDurations)
@@ -173,6 +169,16 @@ async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken) 
 
     const freshTracks = (await Promise.all(
         topIds.map(async id => {
+            if (realtimeTracksMetadata[id]) {
+                const meta = realtimeTracksMetadata[id];
+                return {
+                    id: id,
+                    name: meta.name,
+                    artists: [{ name: meta.artistName }],
+                    album: { images: [{ url: meta.albumArtUrl }] },
+                    external_urls: { spotify: `https://open.spotify.com/track/${id}` }
+                };
+            }
             let track = JSON.parse(localStorage.getItem('spotify_track_' + id));
             if (!track && spotifyToken) {
                 try {
@@ -239,111 +245,156 @@ async function checkSavedStats(session) {
     const prefs = data?.preferences || { merge_history: false };
     if (toggleEl) toggleEl.checked = prefs.merge_history;
 
-    if (data?.historical_stats) {
-        document.getElementById('upload-section').classList.add('hidden');
-        document.getElementById('header-desc').classList.add('hidden');
+    // Inicializar objeto stats (con template vacío si es necesario)
+    let stats = data?.historical_stats
+        ? JSON.parse(JSON.stringify(data.historical_stats))
+        : {
+            hours: 0,
+            totalMsPlayed: 0,
+            totalDays: 0,
+            totalUniqueArtists: 0,
+            totalUniqueTracks: 0,
+            topArtists: [],
+            topTracks: [],
+            yearlyStats: {},
+            availableYears: []
+        };
 
-        let stats = JSON.parse(JSON.stringify(data.historical_stats));
+    // Consultar las sesiones de tiempo real incluyendo las nuevas columnas de metadatos
+    const { data: realtimeSessions } = await supabaseClient
+        .from('listening_sessions')
+        .select('track_id, duration_ms, played_at, track_name, artist_name, album_art_url')
+        .eq('user_id', session.user.id);
 
-        // === SIEMPRE: sumar horas acumuladas en tiempo real al total ===
-        // (independientemente del toggle)
-        const { data: realtimeSessions } = await supabaseClient
-            .from('listening_sessions')
-            .select('track_id, duration_ms, played_at')
-            .eq('user_id', session.user.id);
+    if (realtimeSessions?.length > 0) {
+        const realtimeDaysGlobal = new Set();
+        const realtimeDaysByYear = {}; // { "2026": Set }
+        const realtimeDaysByMonth = {}; // { "2026-05": Set }
 
-        if (realtimeSessions?.length > 0) {
-            const realtimeDaysGlobal = new Set();
-            const realtimeDaysByYear = {}; // { "2026": Set }
-            const realtimeDaysByMonth = {}; // { "2026-05": Set }
+        const realtimeMsByYear = {};
+        const realtimeMsByMonth = {};
+        let realtimeMsGlobal = 0;
 
-            const realtimeMsByYear = {};
-            const realtimeMsByMonth = {};
-            let realtimeMsGlobal = 0;
+        const realtimeTracksGlobal = {};
+        const realtimeTracksByYear = {};
+        const realtimeTracksByMonth = {};
 
-            const realtimeTracksGlobal = {};
-            const realtimeTracksByYear = {};
-            const realtimeTracksByMonth = {};
+        // Mapeo local de metadatos para evitar llamadas a Spotify
+        const realtimeTracksMetadata = {};
 
-            realtimeSessions.forEach(s => {
-                const date = new Date(s.played_at);
-                const yr = date.getFullYear().toString();
-                const mo = (date.getMonth() + 1).toString().padStart(2, '0');
-                const moKey = `${yr}-${mo}`;
-                const dayKey = s.played_at.substring(0, 10);
+        // Inicializar arreglos de distribución global si no existen
+        if (!stats.hourlyMs) stats.hourlyMs = Array(24).fill(0);
+        if (!stats.weekdayMs) stats.weekdayMs = Array(7).fill(0);
 
-                // Global
-                realtimeMsGlobal += s.duration_ms;
-                realtimeDaysGlobal.add(dayKey);
-                realtimeTracksGlobal[s.track_id] = (realtimeTracksGlobal[s.track_id] || 0) + s.duration_ms;
+        realtimeSessions.forEach(s => {
+            const date = new Date(s.played_at);
+            const yr = date.getFullYear().toString();
+            const mo = (date.getMonth() + 1).toString().padStart(2, '0');
+            const moKey = `${yr}-${mo}`;
+            const dayKey = s.played_at.substring(0, 10);
+            const hour = date.getHours();
+            const day = date.getDay();
 
-                // Year
-                realtimeMsByYear[yr] = (realtimeMsByYear[yr] || 0) + s.duration_ms;
-                if (!realtimeDaysByYear[yr]) realtimeDaysByYear[yr] = new Set();
-                realtimeDaysByYear[yr].add(dayKey);
-                if (!realtimeTracksByYear[yr]) realtimeTracksByYear[yr] = {};
-                realtimeTracksByYear[yr][s.track_id] = (realtimeTracksByYear[yr][s.track_id] || 0) + s.duration_ms;
-
-                // Month
-                realtimeMsByMonth[moKey] = (realtimeMsByMonth[moKey] || 0) + s.duration_ms;
-                if (!realtimeDaysByMonth[moKey]) realtimeDaysByMonth[moKey] = new Set();
-                realtimeDaysByMonth[moKey].add(dayKey);
-                if (!realtimeTracksByMonth[moKey]) realtimeTracksByMonth[moKey] = {};
-                realtimeTracksByMonth[moKey][s.track_id] = (realtimeTracksByMonth[moKey][s.track_id] || 0) + s.duration_ms;
-            });
-
-            // Merge Global
-            stats.totalMsPlayed = (stats.totalMsPlayed || stats.hours * 3600000) + realtimeMsGlobal;
-            stats.hours = Math.floor(stats.totalMsPlayed / 3600000);
-            stats.totalDays = (stats.totalDays || 0) + realtimeDaysGlobal.size;
-
-            if (prefs.merge_history && spotifyToken) {
-                await mergePeriodTops(stats, realtimeTracksGlobal, spotifyToken);
+            // Mapear metadatos locales
+            if (s.track_name && s.artist_name && !realtimeTracksMetadata[s.track_id]) {
+                realtimeTracksMetadata[s.track_id] = {
+                    name: s.track_name,
+                    artistName: s.artist_name,
+                    albumArtUrl: s.album_art_url
+                };
             }
 
-            // Merge Years
-            for (const [yr, ms] of Object.entries(realtimeMsByYear)) {
-                if (!stats.yearlyStats[yr]) {
-                    stats.yearlyStats[yr] = { hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, topArtists: [], topTracks: [], months: {} };
-                }
-                const yrStat = stats.yearlyStats[yr];
-                yrStat.totalMsPlayed += ms;
-                yrStat.hours = Math.floor(yrStat.totalMsPlayed / 3600000);
-                yrStat.totalDays = (yrStat.totalDays || 0) + realtimeDaysByYear[yr].size;
+            // Global
+            realtimeMsGlobal += s.duration_ms;
+            realtimeDaysGlobal.add(dayKey);
+            realtimeTracksGlobal[s.track_id] = (realtimeTracksGlobal[s.track_id] || 0) + s.duration_ms;
+            stats.hourlyMs[hour] = (stats.hourlyMs[hour] || 0) + s.duration_ms;
+            stats.weekdayMs[day] = (stats.weekdayMs[day] || 0) + s.duration_ms;
 
-                if (prefs.merge_history && spotifyToken) {
-                    await mergePeriodTops(yrStat, realtimeTracksByYear[yr], spotifyToken);
-                }
+            // Year
+            realtimeMsByYear[yr] = (realtimeMsByYear[yr] || 0) + s.duration_ms;
+            if (!realtimeDaysByYear[yr]) realtimeDaysByYear[yr] = new Set();
+            realtimeDaysByYear[yr].add(dayKey);
+            if (!realtimeTracksByYear[yr]) realtimeTracksByYear[yr] = {};
+            realtimeTracksByYear[yr][s.track_id] = (realtimeTracksByYear[yr][s.track_id] || 0) + s.duration_ms;
+
+            if (!stats.yearlyStats) stats.yearlyStats = {};
+            if (!stats.yearlyStats[yr]) {
+                stats.yearlyStats[yr] = { 
+                    hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, 
+                    topArtists: [], topTracks: [], months: {},
+                    hourlyMs: Array(24).fill(0), weekdayMs: Array(7).fill(0)
+                };
             }
+            if (!stats.yearlyStats[yr].hourlyMs) stats.yearlyStats[yr].hourlyMs = Array(24).fill(0);
+            if (!stats.yearlyStats[yr].weekdayMs) stats.yearlyStats[yr].weekdayMs = Array(7).fill(0);
+            stats.yearlyStats[yr].hourlyMs[hour] = (stats.yearlyStats[yr].hourlyMs[hour] || 0) + s.duration_ms;
+            stats.yearlyStats[yr].weekdayMs[day] = (stats.yearlyStats[yr].weekdayMs[day] || 0) + s.duration_ms;
 
-            // Merge Months
-            for (const [moKey, ms] of Object.entries(realtimeMsByMonth)) {
-                const [yr, mo] = moKey.split('-');
-                if (!stats.yearlyStats[yr]) {
-                    stats.yearlyStats[yr] = { hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, topArtists: [], topTracks: [], months: {} };
-                }
-                if (!stats.yearlyStats[yr].months) stats.yearlyStats[yr].months = {};
-                if (!stats.yearlyStats[yr].months[mo]) {
-                    stats.yearlyStats[yr].months[mo] = { hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, topArtists: [], topTracks: [] };
-                }
-                const moStat = stats.yearlyStats[yr].months[mo];
-                moStat.totalMsPlayed += ms;
-                moStat.hours = Math.floor(moStat.totalMsPlayed / 3600000);
-                moStat.totalDays = (moStat.totalDays || 0) + realtimeDaysByMonth[moKey].size;
+            // Month
+            realtimeMsByMonth[moKey] = (realtimeMsByMonth[moKey] || 0) + s.duration_ms;
+            if (!realtimeDaysByMonth[moKey]) realtimeDaysByMonth[moKey] = new Set();
+            realtimeDaysByMonth[moKey].add(dayKey);
+            if (!realtimeTracksByMonth[moKey]) realtimeTracksByMonth[moKey] = {};
+            realtimeTracksByMonth[moKey][s.track_id] = (realtimeTracksByMonth[moKey][s.track_id] || 0) + s.duration_ms;
 
-                if (prefs.merge_history && spotifyToken) {
-                    await mergePeriodTops(moStat, realtimeTracksByMonth[moKey], spotifyToken);
-                }
+            if (!stats.yearlyStats[yr].months) stats.yearlyStats[yr].months = {};
+            if (!stats.yearlyStats[yr].months[mo]) {
+                stats.yearlyStats[yr].months[mo] = { 
+                    hours: 0, totalMsPlayed: 0, totalDays: 0, totalUniqueArtists: 0, totalUniqueTracks: 0, 
+                    topArtists: [], topTracks: [],
+                    hourlyMs: Array(24).fill(0), weekdayMs: Array(7).fill(0)
+                };
             }
+            const moStat = stats.yearlyStats[yr].months[mo];
+            if (!moStat.hourlyMs) moStat.hourlyMs = Array(24).fill(0);
+            if (!moStat.weekdayMs) moStat.weekdayMs = Array(7).fill(0);
+            moStat.hourlyMs[hour] = (moStat.hourlyMs[hour] || 0) + s.duration_ms;
+            moStat.weekdayMs[day] = (moStat.weekdayMs[day] || 0) + s.duration_ms;
+        });
 
-            // Refresh availableYears
-            stats.availableYears = Object.keys(stats.yearlyStats || {}).sort().reverse();
+        // Merge Global
+        stats.totalMsPlayed = (stats.totalMsPlayed || stats.hours * 3600000) + realtimeMsGlobal;
+        stats.hours = Math.floor(stats.totalMsPlayed / 3600000);
+        stats.totalDays = (stats.totalDays || 0) + realtimeDaysGlobal.size;
+
+        if (prefs.merge_history && spotifyToken) {
+            await mergePeriodTops(stats, realtimeTracksGlobal, spotifyToken, realtimeTracksMetadata);
         }
 
-        globalStats = stats;
-        renderYearTabs(stats, spotifyToken);
-        renderStats(stats, spotifyToken);
+        // Merge Years
+        for (const [yr, ms] of Object.entries(realtimeMsByYear)) {
+            const yrStat = stats.yearlyStats[yr];
+            yrStat.totalMsPlayed += ms;
+            yrStat.hours = Math.floor(yrStat.totalMsPlayed / 3600000);
+            yrStat.totalDays = (yrStat.totalDays || 0) + realtimeDaysByYear[yr].size;
+
+            if (prefs.merge_history && spotifyToken) {
+                await mergePeriodTops(yrStat, realtimeTracksByYear[yr], spotifyToken, realtimeTracksMetadata);
+            }
+        }
+
+        // Merge Months
+        for (const [moKey, ms] of Object.entries(realtimeMsByMonth)) {
+            const [yr, mo] = moKey.split('-');
+            const moStat = stats.yearlyStats[yr].months[mo];
+            moStat.totalMsPlayed += ms;
+            moStat.hours = Math.floor(moStat.totalMsPlayed / 3600000);
+            moStat.totalDays = (moStat.totalDays || 0) + realtimeDaysByMonth[moKey].size;
+
+            if (prefs.merge_history && spotifyToken) {
+                await mergePeriodTops(moStat, realtimeTracksByMonth[moKey], spotifyToken, realtimeTracksMetadata);
+            }
+        }
+
+        // Refresh availableYears
+        stats.availableYears = Object.keys(stats.yearlyStats || {}).sort().reverse();
     }
+
+    globalStats = stats;
+    renderYearTabs(stats, spotifyToken);
+    renderStats(stats, spotifyToken);
+}
 }
 
 // ============================================================
@@ -399,6 +450,8 @@ async function processFiles(files, _closureSession) {
     const artistsCount = {}, tracksCount = {};
     const yearlyData = {};
     const activeDays = new Set();
+    const hourlyMs = Array(24).fill(0);
+    const weekdayMs = Array(7).fill(0);
 
     allData.forEach(item => {
         const ms     = item.ms_played || item.msPlayed || 0;
@@ -406,15 +459,17 @@ async function processFiles(files, _closureSession) {
         const track  = item.master_metadata_track_name || item.trackName;
         const uri    = item.spotify_track_uri || null;
 
-        let year = null, month = null, dayKey = null;
+        let year = null, month = null, dayKey = null, dateObj = null;
         if (item.ts) {
             year = item.ts.substring(0, 4);
             month = item.ts.substring(5, 7);
             dayKey = item.ts.substring(0, 10);
+            dateObj = new Date(item.ts);
         } else if (item.endTime) {
             year = item.endTime.substring(0, 4);
             month = item.endTime.substring(5, 7);
             dayKey = item.endTime.substring(0, 10);
+            dateObj = new Date(item.endTime.replace(' ', 'T'));
         }
         if (dayKey) activeDays.add(dayKey);
 
@@ -427,6 +482,13 @@ async function processFiles(files, _closureSession) {
         if (!tracksCount[key]) tracksCount[key] = { ms: 0, uri, trackName: track, artistName: artist };
         tracksCount[key].ms += ms;
 
+        if (dateObj && !isNaN(dateObj.getTime())) {
+            const h = dateObj.getHours();
+            const d = dateObj.getDay();
+            hourlyMs[h] = (hourlyMs[h] || 0) + ms;
+            weekdayMs[d] = (weekdayMs[d] || 0) + ms;
+        }
+
         if (year) {
             if (!yearlyData[year]) {
                 yearlyData[year] = { 
@@ -434,7 +496,9 @@ async function processFiles(files, _closureSession) {
                     artistsCount: {}, 
                     tracksCount: {}, 
                     activeDays: new Set(),
-                    months: {} 
+                    months: {},
+                    hourlyMs: Array(24).fill(0),
+                    weekdayMs: Array(7).fill(0)
                 };
             }
             yearlyData[year].totalMs += ms;
@@ -442,6 +506,13 @@ async function processFiles(files, _closureSession) {
             if (!yearlyData[year].tracksCount[key]) yearlyData[year].tracksCount[key] = { ms: 0, uri, trackName: track, artistName: artist };
             yearlyData[year].tracksCount[key].ms += ms;
             if (dayKey) yearlyData[year].activeDays.add(dayKey);
+            
+            if (dateObj && !isNaN(dateObj.getTime())) {
+                const h = dateObj.getHours();
+                const d = dateObj.getDay();
+                yearlyData[year].hourlyMs[h] = (yearlyData[year].hourlyMs[h] || 0) + ms;
+                yearlyData[year].weekdayMs[d] = (yearlyData[year].weekdayMs[d] || 0) + ms;
+            }
 
             if (month) {
                 if (!yearlyData[year].months[month]) {
@@ -449,7 +520,9 @@ async function processFiles(files, _closureSession) {
                         totalMs: 0, 
                         artistsCount: {}, 
                         tracksCount: {}, 
-                        activeDays: new Set() 
+                        activeDays: new Set(),
+                        hourlyMs: Array(24).fill(0),
+                        weekdayMs: Array(7).fill(0)
                     };
                 }
                 const mData = yearlyData[year].months[month];
@@ -458,6 +531,13 @@ async function processFiles(files, _closureSession) {
                 if (!mData.tracksCount[key]) mData.tracksCount[key] = { ms: 0, uri, trackName: track, artistName: artist };
                 mData.tracksCount[key].ms += ms;
                 if (dayKey) mData.activeDays.add(dayKey);
+
+                if (dateObj && !isNaN(dateObj.getTime())) {
+                    const h = dateObj.getHours();
+                    const d = dateObj.getDay();
+                    mData.hourlyMs[h] = (mData.hourlyMs[h] || 0) + ms;
+                    mData.weekdayMs[d] = (mData.weekdayMs[d] || 0) + ms;
+                }
             }
         }
     });
@@ -475,7 +555,9 @@ async function processFiles(files, _closureSession) {
                 totalUniqueArtists: Object.keys(md.artistsCount).length,
                 totalUniqueTracks:  Object.keys(md.tracksCount).length,
                 topArtists: Object.entries(md.artistsCount).sort((a,b)=>b[1]-a[1]).slice(0,10).map(x=>({ name:x[0], ms:x[1] })),
-                topTracks:  Object.values(md.tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10)
+                topTracks:  Object.values(md.tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10),
+                hourlyMs: md.hourlyMs,
+                weekdayMs: md.weekdayMs
             };
         });
 
@@ -487,7 +569,9 @@ async function processFiles(files, _closureSession) {
             totalUniqueTracks:  Object.keys(yd.tracksCount).length,
             topArtists: Object.entries(yd.artistsCount).sort((a,b)=>b[1]-a[1]).slice(0,10).map(x=>({ name:x[0], ms:x[1] })),
             topTracks:  Object.values(yd.tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10),
-            months
+            months,
+            hourlyMs: yd.hourlyMs,
+            weekdayMs: yd.weekdayMs
         };
     });
 
@@ -500,7 +584,9 @@ async function processFiles(files, _closureSession) {
         topArtists: Object.entries(artistsCount).sort((a,b)=>b[1]-a[1]).slice(0,10).map(x=>({ name:x[0], ms:x[1] })),
         topTracks:  Object.values(tracksCount).sort((a,b)=>b.ms-a.ms).slice(0,10),
         yearlyStats,
-        availableYears: Object.keys(yearlyStats).sort().reverse()
+        availableYears: Object.keys(yearlyStats).sort().reverse(),
+        hourlyMs,
+        weekdayMs
     };
 
     setProgress(progressFill, progressText, 90, 'Guardando en la nube...');
@@ -657,6 +743,148 @@ function renderMonthTabs(stats, token, year) {
 }
 
 // ============================================================
+// CALCULAR Y RENDERIZAR INSIGHTS AVANZADOS
+// ============================================================
+function renderAdvancedInsights(stats) {
+    const hourlyMs = stats.hourlyMs || Array(24).fill(0);
+    const weekdayMs = stats.weekdayMs || Array(7).fill(0);
+
+    const WEEKDAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const MONTH_NAMES = {
+        '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril', '05': 'Mayo', '06': 'Junio',
+        '07': 'Julio', '08': 'Agosto', '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+    };
+
+    // 1. Peak Hour
+    let peakHour = 0;
+    let maxHourMs = 0;
+    let totalHourMs = 0;
+    for (let h = 0; h < 24; h++) {
+        const ms = hourlyMs[h] || 0;
+        totalHourMs += ms;
+        if (ms > maxHourMs) {
+            maxHourMs = ms;
+            peakHour = h;
+        }
+    }
+    const hourEl = document.getElementById('insight-peak-hour');
+    const hourSubEl = document.getElementById('insight-peak-hour-sub');
+    if (hourEl && hourSubEl) {
+        if (totalHourMs > 0) {
+            const endHour = (peakHour + 1) % 24;
+            const pct = Math.round((maxHourMs / totalHourMs) * 100);
+            
+            let momentIcon = '🌙';
+            if (peakHour >= 6 && peakHour < 12) momentIcon = '🌅';
+            else if (peakHour >= 12 && peakHour < 18) momentIcon = '☀️';
+            else if (peakHour >= 18 && peakHour < 24) momentIcon = '🌙';
+            else momentIcon = '🌌';
+            
+            hourEl.textContent = `${momentIcon} ${peakHour.toString().padStart(2, '0')}:00 - ${endHour.toString().padStart(2, '0')}:00`;
+            hourSubEl.textContent = `${pct}% de tus reproducciones`;
+        } else {
+            hourEl.textContent = 'Sin datos';
+            hourSubEl.textContent = 'Sigue escuchando';
+        }
+    }
+
+    // 2. Favorite Day
+    let peakDay = 0;
+    let maxDayMs = 0;
+    let totalDayMs = 0;
+    for (let d = 0; d < 7; d++) {
+        const ms = weekdayMs[d] || 0;
+        totalDayMs += ms;
+        if (ms > maxDayMs) {
+            maxDayMs = ms;
+            peakDay = d;
+        }
+    }
+    const dayEl = document.getElementById('insight-peak-day');
+    const daySubEl = document.getElementById('insight-peak-day-sub');
+    if (dayEl && daySubEl) {
+        if (totalDayMs > 0) {
+            const pct = Math.round((maxDayMs / totalDayMs) * 100);
+            dayEl.textContent = WEEKDAY_NAMES[peakDay];
+            daySubEl.textContent = `${pct}% de tu música total`;
+        } else {
+            dayEl.textContent = 'Sin datos';
+            daySubEl.textContent = 'Sigue escuchando';
+        }
+    }
+
+    // 3. Peak Month
+    let maxMonthName = 'Sin datos';
+    let maxMonthMs = 0;
+    
+    if (stats.yearlyStats) {
+        Object.entries(stats.yearlyStats).forEach(([year, yData]) => {
+            if (yData.months) {
+                Object.entries(yData.months).forEach(([month, mData]) => {
+                    if (mData.totalMsPlayed > maxMonthMs) {
+                        maxMonthMs = mData.totalMsPlayed;
+                        maxMonthName = `${MONTH_NAMES[month] || month} ${year}`;
+                    }
+                });
+            }
+        });
+    } else if (stats.months) {
+        Object.entries(stats.months).forEach(([month, mData]) => {
+            if (mData.totalMsPlayed > maxMonthMs) {
+                maxMonthMs = mData.totalMsPlayed;
+                maxMonthName = `${MONTH_NAMES[month] || month}`;
+            }
+        });
+    } else {
+        maxMonthMs = stats.totalMsPlayed || 0;
+        maxMonthName = stats.totalMsPlayed > 0 ? 'Este mes' : 'Sin datos';
+    }
+
+    const monthEl = document.getElementById('insight-peak-month');
+    const monthSubEl = document.getElementById('insight-peak-month-sub');
+    if (monthEl && monthSubEl) {
+        if (maxMonthMs > 0) {
+            const hours = Math.round(maxMonthMs / 3600000);
+            monthEl.textContent = maxMonthName;
+            monthSubEl.textContent = `${hours}h de reproducción`;
+        } else {
+            monthEl.textContent = 'Sin datos';
+            monthSubEl.textContent = 'Sigue escuchando';
+        }
+    }
+
+    // 4. Moments of Day Breakdown
+    let dawnMs = 0, morningMs = 0, afternoonMs = 0, nightMs = 0;
+    for (let h = 0; h < 24; h++) {
+        const ms = hourlyMs[h] || 0;
+        if (h >= 0 && h < 6) dawnMs += ms;
+        else if (h >= 6 && h < 12) morningMs += ms;
+        else if (h >= 12 && h < 18) afternoonMs += ms;
+        else nightMs += ms;
+    }
+    const totalMomentsMs = dawnMs + morningMs + afternoonMs + nightMs || 1;
+    const dawnPct = Math.round((dawnMs / totalMomentsMs) * 100);
+    const morningPct = Math.round((morningMs / totalMomentsMs) * 100);
+    const afternoonPct = Math.round((afternoonMs / totalMomentsMs) * 100);
+    const nightPct = Math.round((nightMs / totalMomentsMs) * 100);
+
+    const updateBar = (id, pctId, pct) => {
+        const bar = document.getElementById(id);
+        const val = document.getElementById(pctId);
+        if (bar && val) {
+            val.textContent = `${pct}%`;
+            setTimeout(() => {
+                bar.style.width = `${pct}%`;
+            }, 100);
+        }
+    };
+    updateBar('bar-dawn', 'pct-dawn-val', dawnPct);
+    updateBar('bar-morning', 'pct-morning-val', morningPct);
+    updateBar('bar-afternoon', 'pct-afternoon-val', afternoonPct);
+    updateBar('bar-night', 'pct-night-val', nightPct);
+}
+
+// ============================================================
 // RENDERIZAR ESTADÍSTICAS
 // ============================================================
 async function renderStats(stats, spotifyToken, year = 'all') {
@@ -667,6 +895,9 @@ async function renderStats(stats, spotifyToken, year = 'all') {
     animateCounter(document.getElementById('stat-days'),    stats.totalDays || 0,    '');
     animateCounter(document.getElementById('stat-tracks'),  stats.totalUniqueTracks, '');
     animateCounter(document.getElementById('stat-artists'), stats.totalUniqueArtists,'');
+
+    // Renderizar insights y distribución de momentos
+    renderAdvancedInsights(stats);
 
     // Mostrar skeletons, ocultar listas
     showSkeletons();

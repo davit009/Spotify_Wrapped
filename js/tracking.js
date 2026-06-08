@@ -161,10 +161,13 @@ export async function syncOfflineHistory(session) {
 
         // Construir el batch completo de filas
         const rows = data.items.map(item => ({
-            user_id:     session.user.id,
-            track_id:    item.track.id,
-            duration_ms: item.track.duration_ms,
-            played_at:   new Date(item.played_at).toISOString()
+            user_id:       session.user.id,
+            track_id:      item.track.id,
+            duration_ms:   item.track.duration_ms,
+            played_at:     new Date(item.played_at).toISOString(),
+            track_name:    item.track.name || null,
+            artist_name:   item.track.artists?.map(a => a.name).join(', ') || null,
+            album_art_url: item.track.album?.images?.[0]?.url || null
         }));
 
         // Un solo roundtrip a Supabase — el trigger SQL suma el acumulado
