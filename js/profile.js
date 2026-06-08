@@ -395,7 +395,6 @@ async function checkSavedStats(session) {
     renderYearTabs(stats, spotifyToken);
     renderStats(stats, spotifyToken);
 }
-}
 
 // ============================================================
 // PROCESAR ARCHIVOS JSON SUBIDOS
