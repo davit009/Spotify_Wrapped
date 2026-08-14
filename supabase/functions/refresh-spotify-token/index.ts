@@ -61,14 +61,19 @@ serve(async (req) => {
     const spotifyData = await spotifyRes.json();
     const newAccessToken   = spotifyData.access_token;
     const newRefreshToken  = spotifyData.refresh_token; // Spotify a veces rota el refresh_token
+    const expiresIn        = spotifyData.expires_in ?? 3600;
 
-    // Guardar en BD (y el nuevo refresh_token si Spotify lo rotó)
-    const updatePayload: Record<string, string> = { spotify_access_token: newAccessToken };
+    // Guardar en BD (y el nuevo refresh_token si Spotify lo rotó) junto con
+    // la fecha de expiración, para que el frontend sepa cuándo volver a refrescar.
+    const updatePayload: Record<string, string> = {
+      spotify_access_token: newAccessToken,
+      spotify_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+    };
     if (newRefreshToken) updatePayload.spotify_refresh_token = newRefreshToken;
 
     await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
 
-    return json({ access_token: newAccessToken, expires_in: spotifyData.expires_in ?? 3600 });
+    return json({ access_token: newAccessToken, expires_in: expiresIn });
   } catch (e) {
     console.error('Error inesperado:', e);
     return json({ error: e.message }, 500);
