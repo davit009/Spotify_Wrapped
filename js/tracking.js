@@ -154,7 +154,13 @@ export async function syncOfflineHistory(session) {
         const response = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+            // Visibilidad: sin esto, un 401 (token vencido) o 429 (rate limit,
+            // ver Retry-After en la doc de Spotify) fallaba en silencio y las
+            // canciones de esa ronda de sondeo simplemente no se guardaban.
+            console.warn(`syncOfflineHistory: recently-played respondió ${response.status}`);
+            return;
+        }
 
         const data = await response.json();
         if (!data.items?.length) return;
@@ -172,9 +178,15 @@ export async function syncOfflineHistory(session) {
 
         // Un solo roundtrip a Supabase — el trigger SQL suma el acumulado
         // solo para las filas realmente nuevas (INSERT), no para duplicados (UPDATE).
-        await supabaseClient
+        const { error } = await supabaseClient
             .from('listening_sessions')
             .upsert(rows, { onConflict: 'user_id,played_at', ignoreDuplicates: true });
+
+        // Antes este error se descartaba en silencio: si el upsert fallaba
+        // (RLS, o el constraint único de user_id+played_at no existe en la BD),
+        // no se guardaba ninguna canción nueva y el conteo de tiempo/top tracks
+        // quedaba desactualizado sin ningún aviso.
+        if (error) console.error('syncOfflineHistory: error al guardar listening_sessions:', error);
 
     } catch (e) { console.error("Error en syncOfflineHistory:", e); }
 }

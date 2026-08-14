@@ -71,7 +71,8 @@ async function updateUserStats(userId, startDate, prefix) {
         .from('listening_sessions')
         .select('duration_ms, track_id')
         .eq('user_id', userId)
-        .gte('played_at', startDate);
+        .gte('played_at', startDate)
+        .limit(10000);
 
     if (error) return;
 

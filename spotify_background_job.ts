@@ -78,12 +78,18 @@ serve(async (req: Request) => {
             if (sessionsToInsert.length === 0) continue;
 
             // D. Insertar evitando duplicados (upsert basado en el played_at)
-            const { error: insertError } = await supabaseAdmin
+            // .select() hace que Postgres/PostgREST devuelva solo las filas que
+            // realmente se insertaron (las duplicadas se descartan por ignoreDuplicates
+            // y no vienen en la respuesta), así el contador refleja canciones nuevas reales.
+            const { data: insertedRows, error: insertError } = await supabaseAdmin
                 .from('listening_sessions')
-                .upsert(sessionsToInsert, { onConflict: 'user_id, played_at', ignoreDuplicates: true });
+                .upsert(sessionsToInsert, { onConflict: 'user_id, played_at', ignoreDuplicates: true })
+                .select('user_id');
 
-            if (!insertError) {
-                tracksSavedCount += sessionsToInsert.length;
+            if (insertError) {
+                console.error(`Error guardando listening_sessions para usuario ${user.id}:`, insertError);
+            } else {
+                tracksSavedCount += insertedRows?.length ?? 0;
             }
         }
 

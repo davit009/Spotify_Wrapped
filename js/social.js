@@ -290,8 +290,8 @@ async function renderArena(userId) {
 async function getWinHistoryOptimized(userId, friendId, challengeStart) {
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); sevenDaysAgo.setHours(0,0,0,0);
     const startDate = new Date(Math.max(sevenDaysAgo, new Date(challengeStart)));
-    const { data: myS } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', userId).gte('played_at', startDate.toISOString());
-    const { data: friS } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', friendId).gte('played_at', startDate.toISOString());
+    const { data: myS } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', userId).gte('played_at', startDate.toISOString()).limit(10000);
+    const { data: friS } = await supabaseClient.from('listening_sessions').select('duration_ms, played_at').eq('user_id', friendId).gte('played_at', startDate.toISOString()).limit(10000);
     let html = '';
     for (let i = 0; i < 7; i++) {
         const d = new Date(); d.setDate(d.getDate() - (6 - i)); d.setHours(0,0,0,0);
@@ -316,8 +316,8 @@ async function updateStreakAndMatch(userId) {
     // Optimización: 2 queries en lugar de hasta 60. Traemos 30 días de una vez y calculamos en JS.
     const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); thirtyDaysAgo.setHours(0,0,0,0);
     const [{ data: myAll }, { data: friAll }] = await Promise.all([
-        supabaseClient.from('listening_sessions').select('duration_ms, played_at, track_id').eq('user_id', userId).gte('played_at', thirtyDaysAgo.toISOString()),
-        supabaseClient.from('listening_sessions').select('duration_ms, played_at, track_id').eq('user_id', friendId).gte('played_at', thirtyDaysAgo.toISOString())
+        supabaseClient.from('listening_sessions').select('duration_ms, played_at, track_id').eq('user_id', userId).gte('played_at', thirtyDaysAgo.toISOString()).limit(10000),
+        supabaseClient.from('listening_sessions').select('duration_ms, played_at, track_id').eq('user_id', friendId).gte('played_at', thirtyDaysAgo.toISOString()).limit(10000)
     ]);
 
     let streakCount = 0;
@@ -342,7 +342,7 @@ async function updateStreakAndMatch(userId) {
 }
 
 async function getListeningTimeInRange(userId, start, end) {
-    const { data } = await supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId).gte('played_at', start).lte('played_at', end);
+    const { data } = await supabaseClient.from('listening_sessions').select('duration_ms').eq('user_id', userId).gte('played_at', start).lte('played_at', end).limit(10000);
     return (data || []).reduce((acc, s) => acc + s.duration_ms, 0);
 }
 
