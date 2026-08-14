@@ -1,4 +1,4 @@
-import { supabaseClient } from './supabase.js';
+import { supabaseClient, getSessionResilient } from './supabase.js';
 
 // ── Helpers de navegación entre estados ──────────────────────────────────────
 function goToState(id) {
@@ -58,8 +58,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 1. Verificar si ya hay sesión activa → redirigir al dashboard
     try {
-        const { data } = await supabaseClient.auth.getSession();
-        if (data.session) {
+        const session = await getSessionResilient();
+        if (session) {
             window.location.href = 'dashboard.html';
             return;
         }
