@@ -26,7 +26,7 @@ export async function getValidToken(userId) {
             // Token vencido (o sin fecha registrada, ej. cuentas de antes de este fix):
             // pedirle a la Edge Function que lo refresque con el refresh_token guardado,
             // en vez de obligar al usuario a reconectar Spotify a mano.
-            const refreshed = await refreshSpotifyToken();
+            const refreshed = await refreshSpotifyToken(userId);
             if (refreshed) return refreshed;
 
             // Si el refresh falla (p.ej. todavía no hay refresh_token guardado para
@@ -62,14 +62,25 @@ export async function getValidToken(userId) {
  * que usa el refresh_token guardado en BD (el client-side nunca debe
  * tener el client_secret de Spotify para hacer esto directamente).
  */
-async function refreshSpotifyToken() {
+async function refreshSpotifyToken(userId) {
     try {
         const { data, error } = await supabaseClient.functions.invoke('refresh-spotify-token');
         if (error) {
             console.warn('No se pudo refrescar el token de Spotify:', error);
             return null;
         }
-        return data?.access_token || null;
+        if (!data?.access_token) return null;
+
+        // Guardamos la expiración también desde el cliente: así este mecanismo
+        // funciona igual aunque la Edge Function desplegada sea una versión
+        // anterior que no persiste spotify_token_expires_at por su cuenta
+        // (esa versión vieja ya devolvía expires_in en su respuesta).
+        const expiresIn = data.expires_in ?? 3600;
+        await supabaseClient.from('users')
+            .update({ spotify_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString() })
+            .eq('id', userId);
+
+        return data.access_token;
     } catch (e) {
         console.warn('Error al refrescar el token de Spotify:', e);
         return null;
