@@ -13,14 +13,28 @@ serve(async (req: Request) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
-        // 2. Obtener usuarios que tengan un refresh token
-        const { data: users, error: usersError } = await supabaseAdmin
-            .from('users')
+        // 2. Obtener usuarios que tengan un refresh token guardado.
+        // Vive en user_spotify_tokens (aislada por RLS de `users`, que
+        // cualquier usuario autenticado puede leer para buscar amigos); si esa
+        // tabla todavía no existe porque no se corrió la migración, caemos de
+        // vuelta a la columna vieja en `users`.
+        let users: { id: string; spotify_refresh_token: string }[] | null = null;
+        const { data: tokenRows, error: tokenRowsError } = await supabaseAdmin
+            .from('user_spotify_tokens')
             .select('id, spotify_refresh_token')
             .not('spotify_refresh_token', 'is', null);
 
-        if (usersError || !users) {
-            throw new Error('Error buscando usuarios: ' + usersError?.message);
+        if (!tokenRowsError && tokenRows) {
+            users = tokenRows;
+        } else {
+            const { data: legacyUsers, error: legacyError } = await supabaseAdmin
+                .from('users')
+                .select('id, spotify_refresh_token')
+                .not('spotify_refresh_token', 'is', null);
+            if (legacyError || !legacyUsers) {
+                throw new Error('Error buscando usuarios: ' + (legacyError?.message ?? tokenRowsError?.message));
+            }
+            users = legacyUsers;
         }
 
         let tracksSavedCount = 0;
@@ -54,7 +68,14 @@ serve(async (req: Request) => {
             if (tokenData.refresh_token) {
                 updatePayload.spotify_refresh_token = tokenData.refresh_token;
             }
-            await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
+            const { error: upsertErr } = await supabaseAdmin
+                .from('user_spotify_tokens')
+                .upsert({ id: user.id, ...updatePayload });
+            if (upsertErr) {
+                // Tabla nueva todavía no existe — no perdemos el refresh,
+                // seguimos guardando en la columna vieja.
+                await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
+            }
 
             // B. Pedir el historial de canciones a Spotify (últimas 50)
             const historyResponse = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {

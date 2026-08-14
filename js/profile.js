@@ -234,11 +234,11 @@ async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken, 
 async function checkSavedStats(session) {
     const { data } = await supabaseClient
         .from('users')
-        .select('historical_stats, preferences, spotify_access_token')
+        .select('historical_stats, preferences')
         .eq('id', session.user.id)
         .single();
 
-    const spotifyToken = data?.spotify_access_token || session.provider_token;
+    const spotifyToken = (await getValidToken(session.user.id)) || session.provider_token;
     globalToken = spotifyToken;
 
     const toggleEl = document.getElementById('toggle-history');
@@ -621,8 +621,7 @@ async function processFiles(files, _closureSession) {
     document.getElementById('upload-section').classList.add('hidden');
     document.getElementById('header-desc').classList.add('hidden');
 
-    const { data: uData } = await supabaseClient.from('users').select('spotify_access_token').eq('id', session.user.id).single();
-    const token = uData?.spotify_access_token || session.provider_token;
+    const token = (await getValidToken(session.user.id)) || session.provider_token;
     globalStats = statsObj;
     globalToken = token;
     renderYearTabs(statsObj, token);

@@ -244,6 +244,7 @@
         import { supabaseClient } from './js/supabase.js';
         import { initDashboard, loadRecentHistory, loadTotalTime } from './js/dashboard_stats.js';
         import { checkCurrentlyPlaying, syncOfflineHistory } from './js/tracking.js';
+        import { persistSpotifyLoginTokens } from './js/token_manager.js';
 
         async function bootstrap() {
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -258,21 +259,12 @@
                 document.getElementById('user-avatar-mobile').src = session.user.user_metadata.avatar_url;
             }
 
-            // Persistir provider_token en DB (crucial para usuarios nuevos).
-            // provider_refresh_token solo viene presente en el login inicial
-            // (no en sesiones restauradas), así que solo lo pisamos cuando existe
-            // — es lo que permite refrescar el access_token sin pedir login de nuevo.
-            if (session.provider_token) {
-                const tokenUpdate = {
-                    spotify_access_token: session.provider_token,
-                    // Spotify emite access_tokens con vida de 3600s (1h) — ver su doc de OAuth.
-                    spotify_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString()
-                };
-                if (session.provider_refresh_token) {
-                    tokenUpdate.spotify_refresh_token = session.provider_refresh_token;
-                }
-                await supabaseClient.from('users').update(tokenUpdate).eq('id', session.user.id);
-            }
+            // Persistir provider_token en DB (crucial para usuarios nuevos) —
+            // ver js/token_manager.js para dónde vive y por qué.
+            await persistSpotifyLoginTokens(session.user.id, {
+                accessToken: session.provider_token,
+                refreshToken: session.provider_refresh_token
+            });
 
         // FIX PERF #5a: Lanzar sync en background SIN await
             // El dashboard no espera a que terminen los 50 upserts para mostrarse.
