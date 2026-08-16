@@ -47,11 +47,13 @@ let currentPlayingBtn = null;
 // Stats globales (para el filtro de año)
 let globalStats = null;
 let globalToken = null;
+let globalUserId = null;
 
 // Sesiones crudas (una fila por reproducción), para el detalle día a día
 // y la lista completa de canciones cuando se elige un mes puntual.
 let rawSessions = [];
 let monthTrackListFull = []; // lista completa del mes activo, sin filtrar por búsqueda
+let monthDetailRequestToken = null; // evita pisar la vista si el usuario cambia de mes a media resolución
 
 // ============================================================
 // INICIALIZACIÓN
@@ -139,11 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Buscador de la lista completa de canciones del mes seleccionado
             document.getElementById('month-track-search')?.addEventListener('input', (e) => {
-                const q = e.target.value.trim().toLowerCase();
-                const filtered = q
-                    ? monthTrackListFull.filter(t => t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
-                    : monthTrackListFull;
-                renderMonthTrackList(filtered);
+                renderMonthTrackList(filterTrackList(e.target.value));
             });
 
             // Dropzone
@@ -283,6 +281,7 @@ async function checkSavedStats(session) {
 
     const spotifyToken = (await getValidToken(session.user.id)) || session.provider_token;
     globalToken = spotifyToken;
+    globalUserId = session.user.id;
 
     const toggleEl = document.getElementById('toggle-history');
     const prefs = data?.preferences || { merge_history: false };
@@ -822,8 +821,9 @@ function getMonthDetail(year, month) {
 
         if (!tracks[s.track_id]) {
             tracks[s.track_id] = {
-                name: s.track_name || 'Canción desconocida',
-                artist: s.artist_name || '',
+                id: s.track_id,
+                name: s.track_name || null,
+                artist: s.artist_name || null,
                 art: s.album_art_url || '',
                 ms: 0,
                 count: 0
@@ -836,7 +836,7 @@ function getMonthDetail(year, month) {
     return { daysInMonth, dailyMs, trackList: Object.values(tracks).sort((a, b) => b.ms - a.ms) };
 }
 
-function renderMonthDetail(year, month) {
+async function renderMonthDetail(year, month) {
     const section = document.getElementById('month-detail');
     if (!section) return;
 
@@ -858,6 +858,77 @@ function renderMonthDetail(year, month) {
     const searchInput = document.getElementById('month-track-search');
     if (searchInput) searchInput.value = '';
     renderMonthTrackList(monthTrackListFull);
+
+    // Canciones guardadas antes de que la app cacheara nombre/artista/portada
+    // llegan sin ese detalle (track_name/artist_name nulos) — se completan
+    // consultando a Spotify por su track_id y se guardan en la BD de una vez,
+    // para no tener que volver a pedirlas la próxima vez.
+    const thisRequestMonth = `${year}-${month}`;
+    monthDetailRequestToken = thisRequestMonth;
+    const missingIds = [...new Set(monthTrackListFull.filter(t => !t.name).map(t => t.id))];
+    if (missingIds.length > 0) {
+        await resolveMissingTrackMetadata(missingIds);
+        // Si el usuario ya cambió de mes mientras resolvíamos, no pisamos su vista actual.
+        if (monthDetailRequestToken !== thisRequestMonth) return;
+        renderMonthTrackList(searchInput?.value ? filterTrackList(searchInput.value) : monthTrackListFull);
+    }
+}
+
+function filterTrackList(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return monthTrackListFull;
+    return monthTrackListFull.filter(t =>
+        (t.name || '').toLowerCase().includes(q) || (t.artist || '').toLowerCase().includes(q)
+    );
+}
+
+/**
+ * Completa nombre/artista/portada para track_ids sin metadatos cacheados,
+ * pidiéndolos a Spotify en lotes de 50 (máximo permitido por /v1/tracks), y
+ * los guarda en listening_sessions para que no vuelvan a faltar.
+ */
+async function resolveMissingTrackMetadata(trackIds) {
+    if (!globalToken) return;
+
+    for (let i = 0; i < trackIds.length; i += 50) {
+        const batch = trackIds.slice(i, i + 50);
+        try {
+            const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
+                headers: { Authorization: `Bearer ${globalToken}` }
+            });
+            if (!res.ok) continue;
+            const data = await res.json();
+
+            for (const t of (data.tracks || [])) {
+                if (!t) continue; // Spotify devuelve null si el id ya no existe en su catálogo
+                const meta = {
+                    name: t.name,
+                    artist: t.artists?.map(a => a.name).join(', ') || '',
+                    art: t.album?.images?.[t.album.images.length - 1]?.url || t.album?.images?.[0]?.url || ''
+                };
+
+                const entry = monthTrackListFull.find(x => x.id === t.id);
+                if (entry) Object.assign(entry, meta);
+
+                // Guardar en BD — puede haber varias filas con el mismo track_id
+                // (la misma canción escuchada varias veces ese mes).
+                supabaseClient.from('listening_sessions')
+                    .update({ track_name: meta.name, artist_name: meta.artist, album_art_url: meta.art })
+                    .eq('user_id', globalUserId)
+                    .eq('track_id', t.id)
+                    .then(({ error }) => { if (error) console.warn('No se pudo guardar metadatos de', t.id, error); });
+            }
+
+            // Ritmo suave para no pegarle a Spotify con demasiadas llamadas seguidas.
+            await new Promise(r => setTimeout(r, 100));
+        } catch (e) {
+            console.warn('Error resolviendo metadatos de tracks:', e);
+        }
+    }
+
+    // Lo que Spotify no pudo resolver (id ya no existe) se marca aparte,
+    // en vez de quedarse en "cargando" para siempre.
+    monthTrackListFull.forEach(t => { if (!t.name) t.name = '__unavailable__'; });
 }
 
 function renderDailyChart(dailyMs, year, month) {
@@ -910,13 +981,16 @@ function renderMonthTrackList(list) {
     ul.innerHTML = list.map((t, i) => {
         const m = Math.floor(t.ms / 60000);
         const art = t.art || TRACK_PLACEHOLDER;
+        const isUnavailable = t.name === '__unavailable__';
+        const displayName = isUnavailable ? 'Pista no disponible' : (t.name || 'Cargando…');
+        const displayArtist = isUnavailable ? 'Ya no existe en Spotify' : (t.artist || '');
         return `
             <li class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
                 <span class="text-neutral-600 font-bold w-6 text-center text-xs flex-shrink-0">${i + 1}</span>
                 <img src="${art}" class="w-9 h-9 rounded object-cover shadow-md flex-shrink-0">
                 <div class="flex-1 overflow-hidden min-w-0">
-                    <span class="font-bold text-white text-sm block truncate">${t.name}</span>
-                    <span class="text-neutral-400 text-xs block truncate">${t.artist}</span>
+                    <span class="font-bold text-sm block truncate ${t.name ? 'text-white' : 'text-neutral-500 italic'}">${displayName}</span>
+                    <span class="text-neutral-400 text-xs block truncate">${displayArtist}</span>
                 </div>
                 <span class="text-[10px] font-bold text-neutral-500 flex-shrink-0">${t.count}×</span>
                 <span class="text-xs font-bold text-[#1DB954] flex-shrink-0 w-12 text-right">${m}m</span>
