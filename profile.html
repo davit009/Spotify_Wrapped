@@ -23,6 +23,10 @@
         .artist-bar { background: rgba(255,255,255,0.05); height: 4px; border-radius: 2px; margin-top: 4px; overflow: hidden; }
         .artist-bar-fill { background: #1DB954; height: 100%; width: 0; transition: width 1s ease-out; }
 
+        .daily-bar { flex: 1 1 0; min-width: 3px; background: #1DB954; border-radius: 3px 3px 0 0; cursor: pointer; transition: opacity 0.15s ease, height 0.6s cubic-bezier(0.16,1,0.3,1); }
+        .daily-bar:hover { opacity: 0.7; }
+        .daily-bar-empty { background: rgba(255,255,255,0.08); }
+
         .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
         .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
 
@@ -89,9 +93,12 @@
         </section>
 
         <!-- FILTROS DE TIEMPO (AÑO Y MES) -->
-        <section class="space-y-4">
-            <div id="year-filter" class="flex flex-wrap gap-3 justify-center mb-2"></div>
-            <div id="month-filter" class="flex flex-wrap gap-2 justify-center hidden"></div>
+        <section class="glass p-6 sm:p-8 rounded-[2.5rem] border-white/5 space-y-5">
+            <h3 class="text-md font-black uppercase tracking-widest flex items-center justify-center sm:justify-start gap-3">
+                <span class="text-[#1DB954]">//</span> Elige un período
+            </h3>
+            <div id="year-filter" class="flex flex-wrap gap-3 justify-center sm:justify-start"></div>
+            <div id="month-filter" class="flex flex-wrap gap-2 justify-center sm:justify-start hidden"></div>
         </section>
 
         <!-- CONTENEDOR PRINCIPAL DE ESTADÍSTICAS -->
@@ -205,6 +212,33 @@
                         <div class="h-14 bg-white/5 rounded-2xl animate-pulse"></div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- DETALLE DEL MES SELECCIONADO (día a día + lista completa) -->
+        <section id="month-detail" class="hidden space-y-8">
+            <div class="text-center">
+                <h3 id="month-detail-title" class="text-2xl font-black italic tracking-tight text-gradient">—</h3>
+                <p class="text-xs text-neutral-500 mt-1">Detalle día a día de este mes</p>
+            </div>
+
+            <div class="glass p-6 sm:p-10 rounded-[2.5rem] border-white/5 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h3 class="text-md font-black uppercase tracking-widest flex items-center gap-3"><span class="text-[#1DB954]">//</span> Actividad Diaria</h3>
+                    <p id="daily-chart-caption" class="text-[10px] sm:text-xs text-neutral-500">Pasa el cursor sobre un día para ver el detalle</p>
+                </div>
+                <div id="daily-chart" class="flex items-end gap-[3px] h-40 sm:h-48"></div>
+            </div>
+
+            <div class="glass p-6 sm:p-10 rounded-[2.5rem] border-white/5 space-y-5">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <h3 class="text-md font-black uppercase tracking-widest flex items-center gap-3">
+                        <span class="text-[#1DB954]">//</span> Todas las Canciones <span id="month-track-count" class="text-neutral-500 normal-case font-bold text-xs"></span>
+                    </h3>
+                    <input id="month-track-search" type="text" placeholder="Buscar canción o artista..."
+                           class="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-[#1DB954]/50 w-full sm:w-64">
+                </div>
+                <ul id="month-track-list" class="space-y-1 max-h-[32rem] overflow-y-auto custom-scrollbar pr-1"></ul>
             </div>
         </section>
 

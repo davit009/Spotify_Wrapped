@@ -48,6 +48,11 @@ let currentPlayingBtn = null;
 let globalStats = null;
 let globalToken = null;
 
+// Sesiones crudas (una fila por reproducción), para el detalle día a día
+// y la lista completa de canciones cuando se elige un mes puntual.
+let rawSessions = [];
+let monthTrackListFull = []; // lista completa del mes activo, sin filtrar por búsqueda
+
 // ============================================================
 // INICIALIZACIÓN
 // ============================================================
@@ -130,6 +135,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     .eq('id', session.user.id);
                 closeSettingsModal();
                 checkSavedStats(session); // Recargar desde base de datos en tiempo real
+            });
+
+            // Buscador de la lista completa de canciones del mes seleccionado
+            document.getElementById('month-track-search')?.addEventListener('input', (e) => {
+                const q = e.target.value.trim().toLowerCase();
+                const filtered = q
+                    ? monthTrackListFull.filter(t => t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
+                    : monthTrackListFull;
+                renderMonthTrackList(filtered);
             });
 
             // Dropzone
@@ -229,6 +243,35 @@ async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken, 
 }
 
 // ============================================================
+// TRAER TODO EL HISTORIAL (paginado, sin depender del tope por defecto de Supabase)
+// ============================================================
+const SESSIONS_PAGE_SIZE = 1000;
+
+async function fetchAllListeningSessions(userId) {
+    let rows = [];
+    let from = 0;
+    while (true) {
+        const { data, error } = await supabaseClient
+            .from('listening_sessions')
+            .select('track_id, duration_ms, played_at, track_name, artist_name, album_art_url')
+            .eq('user_id', userId)
+            .order('played_at', { ascending: true })
+            .range(from, from + SESSIONS_PAGE_SIZE - 1);
+
+        if (error) {
+            console.error('Error leyendo listening_sessions:', error);
+            break;
+        }
+        if (!data || data.length === 0) break;
+
+        rows = rows.concat(data);
+        if (data.length < SESSIONS_PAGE_SIZE) break; // última página
+        from += SESSIONS_PAGE_SIZE;
+    }
+    return rows;
+}
+
+// ============================================================
 // LEER ESTADÍSTICAS GUARDADAS
 // ============================================================
 async function checkSavedStats(session) {
@@ -260,13 +303,14 @@ async function checkSavedStats(session) {
             availableYears: []
         };
 
-    // Consultar las sesiones de tiempo real incluyendo las nuevas columnas de metadatos
-    const { data: realtimeSessions } = await supabaseClient
-        .from('listening_sessions')
-        .select('track_id, duration_ms, played_at, track_name, artist_name, album_art_url')
-        .eq('user_id', session.user.id);
+    // Consultar TODAS las sesiones de tiempo real (paginado — sin esto,
+    // Supabase corta el resultado en su tope por defecto y los meses más
+    // viejos o más nuevos que no entraran en esa primera página
+    // simplemente desaparecían de las estadísticas).
+    const realtimeSessions = await fetchAllListeningSessions(session.user.id);
+    rawSessions = realtimeSessions;
 
-    if (realtimeSessions?.length > 0) {
+    if (realtimeSessions.length > 0) {
         const realtimeDaysGlobal = new Set();
         const realtimeDaysByYear = {}; // { "2026": Set }
         const realtimeDaysByMonth = {}; // { "2026-05": Set }
@@ -654,6 +698,11 @@ const MONTH_SHORT_NAMES = {
     '12': 'Dic'
 };
 
+const MONTH_NAMES_FULL = {
+    '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril', '05': 'Mayo', '06': 'Junio',
+    '07': 'Julio', '08': 'Agosto', '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+};
+
 function renderYearTabs(stats, token) {
     const container = document.getElementById('year-filter');
     if (!container || !stats.availableYears?.length) return;
@@ -675,6 +724,7 @@ function renderYearTabs(stats, token) {
             if (displayStats) {
                 renderStats(displayStats, token, yr);
             }
+            hideMonthDetail(); // "Todos los años" no es un mes puntual
             renderMonthTabs(stats, token, yr);
         });
         container.appendChild(btn);
@@ -717,6 +767,7 @@ function renderMonthTabs(stats, token, year) {
         container.querySelectorAll('#month-filter .year-tab').forEach(b => b.classList.remove('active'));
         allBtn.classList.add('active');
         renderStats(yrStats, token, year);
+        hideMonthDetail(); // "Todos los meses" tampoco es un mes puntual
     });
     container.appendChild(allBtn);
 
@@ -735,9 +786,142 @@ function renderMonthTabs(stats, token, year) {
             if (monthStats) {
                 renderStats(monthStats, token, year);
             }
+            renderMonthDetail(year, mo);
         });
         container.appendChild(btn);
     });
+}
+
+// ============================================================
+// DETALLE DEL MES: actividad diaria + lista completa de canciones
+//
+// Se calcula al vuelo desde rawSessions (las filas crudas de
+// listening_sessions ya cargadas), no desde el resumen top-10 guardado
+// en historical_stats — así que solo está disponible para meses
+// trackeados en vivo por la app, no para meses que solo vienen de un
+// Wrapped importado (esos no tienen fila por reproducción).
+// ============================================================
+function hideMonthDetail() {
+    document.getElementById('month-detail')?.classList.add('hidden');
+}
+
+function getMonthDetail(year, month) {
+    const rows = rawSessions.filter(s => {
+        const d = new Date(s.played_at);
+        return d.getFullYear().toString() === year && (d.getMonth() + 1).toString().padStart(2, '0') === month;
+    });
+    if (rows.length === 0) return null;
+
+    const daysInMonth = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    const dailyMs = Array(daysInMonth).fill(0);
+    const tracks = {};
+
+    rows.forEach(s => {
+        const day = new Date(s.played_at).getDate();
+        dailyMs[day - 1] += s.duration_ms;
+
+        if (!tracks[s.track_id]) {
+            tracks[s.track_id] = {
+                name: s.track_name || 'Canción desconocida',
+                artist: s.artist_name || '',
+                art: s.album_art_url || '',
+                ms: 0,
+                count: 0
+            };
+        }
+        tracks[s.track_id].ms += s.duration_ms;
+        tracks[s.track_id].count += 1;
+    });
+
+    return { daysInMonth, dailyMs, trackList: Object.values(tracks).sort((a, b) => b.ms - a.ms) };
+}
+
+function renderMonthDetail(year, month) {
+    const section = document.getElementById('month-detail');
+    if (!section) return;
+
+    const detail = getMonthDetail(year, month);
+    if (!detail) {
+        // Mes cubierto solo por historial importado — sin filas crudas no hay
+        // forma de reconstruir el detalle día a día ni la lista completa.
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+    const title = document.getElementById('month-detail-title');
+    if (title) title.textContent = `${MONTH_NAMES_FULL[month] || month} ${year}`;
+
+    renderDailyChart(detail.dailyMs, year, month);
+
+    monthTrackListFull = detail.trackList;
+    const searchInput = document.getElementById('month-track-search');
+    if (searchInput) searchInput.value = '';
+    renderMonthTrackList(monthTrackListFull);
+}
+
+function renderDailyChart(dailyMs, year, month) {
+    const chart = document.getElementById('daily-chart');
+    const caption = document.getElementById('daily-chart-caption');
+    const defaultCaption = 'Pasa el cursor sobre un día para ver el detalle';
+    if (!chart) return;
+
+    const max = Math.max(...dailyMs, 1);
+    chart.innerHTML = '';
+
+    dailyMs.forEach((ms, idx) => {
+        const day = idx + 1;
+        const hasData = ms > 0;
+        const pct = hasData ? Math.max(Math.round((ms / max) * 100), 4) : 2;
+
+        const bar = document.createElement('div');
+        bar.className = 'daily-bar' + (hasData ? '' : ' daily-bar-empty');
+        bar.style.height = `${pct}%`;
+
+        const hh = Math.floor(ms / 3600000);
+        const mm = Math.floor((ms % 3600000) / 60000);
+        const dateLabel = new Date(parseInt(year, 10), parseInt(month, 10) - 1, day)
+            .toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+        const detailText = hasData ? `${dateLabel} — ${hh}h ${mm}m` : `${dateLabel} — sin reproducciones`;
+        bar.title = detailText;
+
+        bar.addEventListener('mouseenter', () => { if (caption) caption.textContent = detailText; });
+        chart.appendChild(bar);
+    });
+
+    if (caption) {
+        caption.textContent = defaultCaption;
+        chart.onmouseleave = () => { caption.textContent = defaultCaption; };
+    }
+}
+
+function renderMonthTrackList(list) {
+    const ul = document.getElementById('month-track-list');
+    const countEl = document.getElementById('month-track-count');
+    if (!ul) return;
+
+    if (countEl) countEl.textContent = `(${list.length})`;
+
+    if (list.length === 0) {
+        ul.innerHTML = '<li class="text-center text-neutral-600 text-xs py-8">Sin resultados.</li>';
+        return;
+    }
+
+    ul.innerHTML = list.map((t, i) => {
+        const m = Math.floor(t.ms / 60000);
+        const art = t.art || TRACK_PLACEHOLDER;
+        return `
+            <li class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
+                <span class="text-neutral-600 font-bold w-6 text-center text-xs flex-shrink-0">${i + 1}</span>
+                <img src="${art}" class="w-9 h-9 rounded object-cover shadow-md flex-shrink-0">
+                <div class="flex-1 overflow-hidden min-w-0">
+                    <span class="font-bold text-white text-sm block truncate">${t.name}</span>
+                    <span class="text-neutral-400 text-xs block truncate">${t.artist}</span>
+                </div>
+                <span class="text-[10px] font-bold text-neutral-500 flex-shrink-0">${t.count}×</span>
+                <span class="text-xs font-bold text-[#1DB954] flex-shrink-0 w-12 text-right">${m}m</span>
+            </li>`;
+    }).join('');
 }
 
 // ============================================================
