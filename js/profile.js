@@ -229,6 +229,35 @@ async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken, 
 }
 
 // ============================================================
+// TRAER TODO EL HISTORIAL (paginado, sin depender del tope por defecto de Supabase)
+// ============================================================
+const SESSIONS_PAGE_SIZE = 1000;
+
+async function fetchAllListeningSessions(userId) {
+    let rows = [];
+    let from = 0;
+    while (true) {
+        const { data, error } = await supabaseClient
+            .from('listening_sessions')
+            .select('track_id, duration_ms, played_at, track_name, artist_name, album_art_url')
+            .eq('user_id', userId)
+            .order('played_at', { ascending: true })
+            .range(from, from + SESSIONS_PAGE_SIZE - 1);
+
+        if (error) {
+            console.error('Error leyendo listening_sessions:', error);
+            break;
+        }
+        if (!data || data.length === 0) break;
+
+        rows = rows.concat(data);
+        if (data.length < SESSIONS_PAGE_SIZE) break; // última página
+        from += SESSIONS_PAGE_SIZE;
+    }
+    return rows;
+}
+
+// ============================================================
 // LEER ESTADÍSTICAS GUARDADAS
 // ============================================================
 async function checkSavedStats(session) {
@@ -260,13 +289,13 @@ async function checkSavedStats(session) {
             availableYears: []
         };
 
-    // Consultar las sesiones de tiempo real incluyendo las nuevas columnas de metadatos
-    const { data: realtimeSessions } = await supabaseClient
-        .from('listening_sessions')
-        .select('track_id, duration_ms, played_at, track_name, artist_name, album_art_url')
-        .eq('user_id', session.user.id);
+    // Consultar TODAS las sesiones de tiempo real (paginado — sin esto,
+    // Supabase corta el resultado en su tope por defecto y los meses más
+    // viejos o más nuevos que no entraran en esa primera página
+    // simplemente desaparecían de las estadísticas).
+    const realtimeSessions = await fetchAllListeningSessions(session.user.id);
 
-    if (realtimeSessions?.length > 0) {
+    if (realtimeSessions.length > 0) {
         const realtimeDaysGlobal = new Set();
         const realtimeDaysByYear = {}; // { "2026": Set }
         const realtimeDaysByMonth = {}; // { "2026-05": Set }
