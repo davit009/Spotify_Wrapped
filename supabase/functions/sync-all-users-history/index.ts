@@ -1,11 +1,27 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Configuración de Spotify: Se leerá de las variables de entorno de Supabase
+// Reubicado desde spotify_background_job.ts (raíz del repo), que nunca llegó
+// a desplegarse como función real porque no vivía en supabase/functions/ —
+// Supabase solo despliega lo que está en esa carpeta. Sin esto corriendo
+// periódicamente, el historial de un usuario que cierra la pestaña por un
+// rato y escucha más de 50 canciones mientras tanto se pierde para siempre
+// (la API de Spotify solo expone las últimas 50 — ver supabase/schedule_history_sync.sql).
+
 const SPOTIFY_CLIENT_ID = Deno.env.get('SPOTIFY_CLIENT_ID') || '';
 const SPOTIFY_CLIENT_SECRET = Deno.env.get('SPOTIFY_CLIENT_SECRET') || '';
+const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
 
 serve(async (req: Request) => {
+    // Esta función corre con el service role (puede tocar los datos de
+    // cualquier usuario), así que no puede quedar abierta al público —
+    // solo el cron job programado (que manda este mismo secreto) puede
+    // dispararla. Configura CRON_SECRET como variable de entorno de la
+    // función y usa el mismo valor en schedule_history_sync.sql.
+    if (!CRON_SECRET || req.headers.get('x-cron-secret') !== CRON_SECRET) {
+        return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 });
+    }
+
     try {
         // 1. Iniciar conexión administrativa a Supabase
         const supabaseAdmin = createClient(
@@ -38,6 +54,7 @@ serve(async (req: Request) => {
         }
 
         let tracksSavedCount = 0;
+        let usersProcessed = 0;
 
         // 3. Procesar historial de cada usuario
         for (const user of users) {
@@ -62,9 +79,13 @@ serve(async (req: Request) => {
             }
 
             const accessToken = tokenData.access_token;
-            
+            const expiresIn = tokenData.expires_in ?? 3600;
+
             // Guardar el nuevo token en la BD para que el frontend pueda usarlo
-            const updatePayload: any = { spotify_access_token: accessToken };
+            const updatePayload: any = {
+                spotify_access_token: accessToken,
+                spotify_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+            };
             if (tokenData.refresh_token) {
                 updatePayload.spotify_refresh_token = tokenData.refresh_token;
             }
@@ -77,7 +98,8 @@ serve(async (req: Request) => {
                 await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
             }
 
-            // B. Pedir el historial de canciones a Spotify (últimas 50)
+            // B. Pedir el historial de canciones a Spotify (últimas 50 — es el
+            // máximo que la API permite, sin importar el rango de fechas que se pida)
             const historyResponse = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
@@ -96,6 +118,7 @@ serve(async (req: Request) => {
                 album_art_url: item.track.album?.images?.[0]?.url || null
             }));
 
+            usersProcessed++;
             if (sessionsToInsert.length === 0) continue;
 
             // D. Insertar evitando duplicados (upsert basado en el played_at)
@@ -114,11 +137,12 @@ serve(async (req: Request) => {
             }
         }
 
-        return new Response(JSON.stringify({ success: true, processed: tracksSavedCount }), {
+        return new Response(JSON.stringify({ success: true, usersProcessed, tracksSaved: tracksSavedCount }), {
             headers: { "Content-Type": "application/json" },
         });
 
     } catch (err: any) {
+        console.error('Error inesperado:', err);
         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }
 });
