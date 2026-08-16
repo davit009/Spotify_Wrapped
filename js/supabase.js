@@ -15,3 +15,20 @@ export const supabaseClient = (typeof supabase !== 'undefined')
 if (!supabaseClient && typeof window !== 'undefined') {
     console.error("Supabase CDN no encontrado. Asegúrate de incluir <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js'></script>");
 }
+
+/**
+ * Igual que supabaseClient.auth.getSession(), pero con un reintento antes
+ * de darse por vencido. En celular, al reabrir la pestaña justo cuando la
+ * conexión de datos todavía se está reestableciendo, la primera lectura de
+ * sesión puede fallar en silencio aunque el usuario sí tenga una sesión
+ * guardada — sin esto, esa carrera se traducía en "me manda al login".
+ */
+export async function getSessionResilient() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session) return data.session;
+
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const { data: retryData } = await supabaseClient.auth.getSession();
+    return retryData.session;
+}

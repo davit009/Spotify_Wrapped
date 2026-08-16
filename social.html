@@ -163,13 +163,13 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
-        import { supabaseClient } from './js/supabase.js';
+        import { supabaseClient, getSessionResilient } from './js/supabase.js';
         import { initSocial, loadSocialPage } from './js/social.js';
         import { getValidToken } from './js/token_manager.js';
         import { updateForYouBadge } from './js/social.js';
 
         async function bootstrap() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
+            const session = await getSessionResilient();
             if (session) {
                 const user = session.user;
                 document.getElementById('user-name').textContent = user.user_metadata.display_name || user.email.split('@')[0];

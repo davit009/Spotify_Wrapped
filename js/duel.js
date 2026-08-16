@@ -1,4 +1,4 @@
-import { supabaseClient } from './supabase.js';
+import { supabaseClient, getSessionResilient } from './supabase.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const session = await getSessionResilient();
     if (!session) {
         window.location.href = 'index.html';
         return;
@@ -71,7 +71,8 @@ async function updateUserStats(userId, startDate, prefix) {
         .from('listening_sessions')
         .select('duration_ms, track_id')
         .eq('user_id', userId)
-        .gte('played_at', startDate);
+        .gte('played_at', startDate)
+        .limit(10000);
 
     if (error) return;
 

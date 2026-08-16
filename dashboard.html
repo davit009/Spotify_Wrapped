@@ -244,6 +244,7 @@
         import { supabaseClient } from './js/supabase.js';
         import { initDashboard, loadRecentHistory, loadTotalTime } from './js/dashboard_stats.js';
         import { checkCurrentlyPlaying, syncOfflineHistory } from './js/tracking.js';
+        import { persistSpotifyLoginTokens } from './js/token_manager.js';
 
         async function bootstrap() {
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -258,12 +259,12 @@
                 document.getElementById('user-avatar-mobile').src = session.user.user_metadata.avatar_url;
             }
 
-            // Persistir provider_token en DB (crucial para usuarios nuevos)
-            if (session.provider_token) {
-                await supabaseClient.from('users').update({
-                    spotify_access_token: session.provider_token
-                }).eq('id', session.user.id);
-            }
+            // Persistir provider_token en DB (crucial para usuarios nuevos) —
+            // ver js/token_manager.js para dónde vive y por qué.
+            await persistSpotifyLoginTokens(session.user.id, {
+                accessToken: session.provider_token,
+                refreshToken: session.provider_refresh_token
+            });
 
         // FIX PERF #5a: Lanzar sync en background SIN await
             // El dashboard no espera a que terminen los 50 upserts para mostrarse.

@@ -24,14 +24,28 @@ serve(async (req) => {
     );
     if (userErr || !user) return json({ error: 'Usuario inválido' }, 401);
 
-    // Obtener el refresh_token de la BD
-    const { data: userData, error: dbErr } = await supabaseAdmin
-      .from('users')
+    // Obtener el refresh_token de la BD. Vive en user_spotify_tokens (aislada
+    // por RLS de `users`, que cualquier usuario autenticado puede leer para
+    // buscar amigos); si esa tabla todavía no existe porque no se ha corrido
+    // la migración, caemos de vuelta a la columna vieja en `users`.
+    let refreshToken: string | undefined;
+    const { data: tokenRow } = await supabaseAdmin
+      .from('user_spotify_tokens')
       .select('spotify_refresh_token')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
+    refreshToken = tokenRow?.spotify_refresh_token;
 
-    if (dbErr || !userData?.spotify_refresh_token) {
+    if (!refreshToken) {
+      const { data: legacyRow } = await supabaseAdmin
+        .from('users')
+        .select('spotify_refresh_token')
+        .eq('id', user.id)
+        .maybeSingle();
+      refreshToken = legacyRow?.spotify_refresh_token;
+    }
+
+    if (!refreshToken) {
       return json({ error: 'No hay refresh_token guardado. El usuario debe volver a iniciar sesión.' }, 400);
     }
 
@@ -48,7 +62,7 @@ serve(async (req) => {
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        refresh_token: userData.spotify_refresh_token,
+        refresh_token: refreshToken,
       }),
     });
 
@@ -61,14 +75,27 @@ serve(async (req) => {
     const spotifyData = await spotifyRes.json();
     const newAccessToken   = spotifyData.access_token;
     const newRefreshToken  = spotifyData.refresh_token; // Spotify a veces rota el refresh_token
+    const expiresIn        = spotifyData.expires_in ?? 3600;
 
-    // Guardar en BD (y el nuevo refresh_token si Spotify lo rotó)
-    const updatePayload: Record<string, string> = { spotify_access_token: newAccessToken };
+    // Guardar en BD (y el nuevo refresh_token si Spotify lo rotó) junto con
+    // la fecha de expiración, para que el frontend sepa cuándo volver a refrescar.
+    const updatePayload: Record<string, string> = {
+      spotify_access_token: newAccessToken,
+      spotify_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+    };
     if (newRefreshToken) updatePayload.spotify_refresh_token = newRefreshToken;
 
-    await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
+    const { error: upsertErr } = await supabaseAdmin
+      .from('user_spotify_tokens')
+      .upsert({ id: user.id, ...updatePayload });
 
-    return json({ access_token: newAccessToken, expires_in: spotifyData.expires_in ?? 3600 });
+    if (upsertErr) {
+      // La tabla nueva todavía no existe (migración no corrida) — no
+      // perdemos el refresh, seguimos guardando en la columna vieja.
+      await supabaseAdmin.from('users').update(updatePayload).eq('id', user.id);
+    }
+
+    return json({ access_token: newAccessToken, expires_in: expiresIn });
   } catch (e) {
     console.error('Error inesperado:', e);
     return json({ error: e.message }, 500);
