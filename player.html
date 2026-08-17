@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reproductor de Prueba | Playcount</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .text-gradient { background: linear-gradient(to right, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+
+        .profile-dropdown { transform-origin: top right; transition: all 0.2s ease-out; transform: scale(0.95); opacity: 0; pointer-events: none; }
+        .profile-dropdown.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+
+        .status-dot { width: 8px; height: 8px; border-radius: 999px; background: #666; transition: background 0.3s; }
+        .status-dot.ready { background: #1DB954; box-shadow: 0 0 8px #1DB954; }
+        .status-dot.error { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+        .status-dot.connecting { background: #f59e0b; animation: pulse-dot 1s infinite; }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        #play-toggle-icon { transition: transform 0.15s ease; }
+        #play-toggle-btn:active #play-toggle-icon { transform: scale(0.85); }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+
+    <header class="w-full max-w-3xl flex flex-col md:flex-row justify-between items-center mb-8 gap-4 relative z-[100]">
+        <div class="flex items-center gap-3 w-full md:w-auto justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-[#1DB954] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.4)]">
+                    <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                </div>
+                <h1 class="text-xl font-black tracking-tighter">Playcount</h1>
+            </div>
+            <button id="profile-btn-mobile" class="md:hidden w-10 h-10 rounded-full border border-white/20 overflow-hidden">
+                <img id="user-avatar-mobile" src="" class="w-full h-full object-cover bg-neutral-800">
+            </button>
+        </div>
+
+        <nav class="flex items-center gap-4 bg-white/5 px-5 py-2.5 rounded-full border border-white/10 w-full md:w-auto justify-center">
+            <a href="dashboard.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Música</a>
+            <a href="social.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Social</a>
+            <a href="profile.html" class="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white transition-colors">Estadísticas</a>
+            <a href="player.html" class="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Prueba</a>
+        </nav>
+
+        <div class="relative hidden md:block">
+            <button id="profile-btn" class="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10">
+                <img id="user-avatar" src="" class="w-8 h-8 rounded-full bg-neutral-800 object-cover">
+                <span id="user-name" class="text-xs font-bold truncate max-w-[80px]">...</span>
+            </button>
+            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-48 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-1 z-[110]">
+                <a href="profile.html" class="block w-full text-left px-4 py-2.5 hover:bg-white/5 text-white font-bold text-xs rounded-xl mb-1">Ajustes</a>
+                <button id="logout-btn" class="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-500 font-bold text-xs rounded-xl">Cerrar Sesión</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="w-full max-w-3xl space-y-8">
+
+        <section class="text-center py-2">
+            <h2 class="text-3xl sm:text-4xl font-black italic mb-2 tracking-tight text-gradient">Reproductor de Prueba</h2>
+            <p class="text-sm text-neutral-400 max-w-lg mx-auto">
+                Le da play a una canción de verdad a través de tu cuenta de Spotify, directamente desde esta pestaña
+                (sin necesidad de tener Spotify abierto en otro lado), para comprobar que el conteo funciona.
+                Empieza silenciado.
+            </p>
+        </section>
+
+        <section class="glass p-5 rounded-3xl border-white/5 flex items-center gap-3">
+            <span id="status-dot" class="status-dot connecting flex-shrink-0"></span>
+            <p id="status-text" class="text-xs text-neutral-400 flex-1">Conectando con Spotify…</p>
+        </section>
+
+        <section class="glass p-6 sm:p-8 rounded-[2.5rem] border-white/5 space-y-4">
+            <h3 class="text-md font-black uppercase tracking-widest flex items-center gap-3"><span class="text-[#1DB954]">//</span> Buscar Canción</h3>
+            <input id="track-search" type="text" placeholder="Busca una canción o artista..."
+                   class="w-full bg-white/5 border border-white/10 rounded-full px-5 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-[#1DB954]/50">
+            <ul id="search-results" class="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1"></ul>
+        </section>
+
+        <section id="now-testing-card" class="glass p-6 sm:p-8 rounded-[2.5rem] border-[#1DB954]/20 border space-y-6 hidden">
+            <h3 class="text-md font-black uppercase tracking-widest flex items-center gap-3"><span class="text-[#1DB954]">//</span> Probando Ahora</h3>
+
+            <div class="flex items-center gap-4">
+                <img id="now-testing-art" src="" class="w-16 h-16 rounded-2xl object-cover shadow-xl flex-shrink-0 bg-neutral-800">
+                <div class="flex-1 min-w-0">
+                    <p id="now-testing-name" class="font-black text-white truncate">—</p>
+                    <p id="now-testing-artist" class="text-neutral-400 text-sm truncate">—</p>
+                </div>
+                <button id="play-toggle-btn" class="w-14 h-14 rounded-full bg-[#1DB954] flex items-center justify-center shadow-[0_0_20px_rgba(29,185,84,0.4)] flex-shrink-0">
+                    <svg id="play-toggle-icon" class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <svg class="w-4 h-4 text-neutral-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>
+                <input id="volume-slider" type="range" min="0" max="100" value="0" class="w-full accent-[#1DB954]">
+                <span id="volume-label" class="text-[10px] font-black text-neutral-500 w-10 text-right flex-shrink-0">MUTE</span>
+            </div>
+
+            <p class="text-[10px] text-neutral-600 text-center">
+                Esto es una reproducción real de Spotify — cuenta para tu historial igual que cualquier otra.
+            </p>
+        </section>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Debe existir ANTES de que cargue el SDK — si no, la llamada de
+        // Spotify a esta función puede pasar mientras el módulo player.js
+        // (que carga después, diferido) todavía no la definió.
+        window.__spotifySdkReady = false;
+        window.onSpotifyWebPlaybackSDKReady = () => {
+            window.__spotifySdkReady = true;
+            window.dispatchEvent(new Event('spotify-sdk-ready'));
+        };
+    </script>
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script type="module" src="js/player.js"></script>
+</body>
+</html>
