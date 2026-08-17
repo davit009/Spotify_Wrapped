@@ -35,7 +35,7 @@ async function doSpotifyLogin() {
     const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'spotify',
         options: {
-            scopes: 'user-read-currently-playing user-modify-playback-state user-read-playback-state user-read-recently-played user-read-email user-read-private',
+            scopes: 'streaming user-read-currently-playing user-modify-playback-state user-read-playback-state user-read-recently-played user-read-email user-read-private',
             redirectTo: redirectTo
         }
     });
