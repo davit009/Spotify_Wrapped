@@ -20,22 +20,33 @@
 --      valor largo que inventes tú (cualquier texto random de ~40+
 --      caracteres sirve). Esto evita que cualquiera en internet pueda
 --      llamar a la función y gastar tus tokens/cuota de Spotify.
---   3. Reemplazar los dos placeholders de abajo (TU-PROYECTO y
---      TU-CRON-SECRET, debe ser IGUAL al que pusiste en el paso 2) y
+--   3. Reemplazar los tres placeholders de abajo (TU-PROYECTO, TU-ANON-KEY
+--      y TU-CRON-SECRET, debe ser IGUAL al que pusiste en el paso 2) y
 --      correr este script completo en el SQL Editor.
 --
 -- El secreto NO queda en texto plano en la base — Vault lo guarda cifrado
--- y el cron job lo lee solo al momento de ejecutarse.
+-- y el cron job lo lee solo al momento de ejecutarse. La anon key sí es
+-- pública por diseño de Supabase (protegida por RLS, no por ser secreta)
+-- — igual la guardamos en Vault por prolijidad, no por seguridad.
+--
+-- La Authorization con la anon key es OBLIGATORIA: sin ella, la puerta de
+-- entrada de Supabase Edge Functions rechaza la llamada con
+-- UNAUTHORIZED_NO_AUTH_HEADER antes de que el código de la función (y su
+-- propio chequeo de CRON_SECRET) llegue a correr.
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Guardar la URL de la función y el secreto compartido en Vault.
--- ⚠️ Reemplaza los dos valores de abajo antes de correr esto.
+-- Guardar la URL de la función, la anon key y el secreto compartido en Vault.
+-- ⚠️ Reemplaza los tres valores de abajo antes de correr esto.
 SELECT vault.create_secret(
   'https://TU-PROYECTO.supabase.co/functions/v1/sync-all-users-history',
   'history_sync_url'
+);
+SELECT vault.create_secret(
+  'TU-ANON-KEY',
+  'history_sync_anon_key'
 );
 SELECT vault.create_secret(
   'TU-CRON-SECRET',
@@ -58,6 +69,7 @@ SELECT cron.schedule(
     url     := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'history_sync_url'),
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'history_sync_anon_key'),
       'x-cron-secret', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'history_sync_secret')
     ),
     body := '{}'::jsonb
