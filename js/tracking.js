@@ -14,18 +14,16 @@ export async function checkCurrentlyPlaying(session) {
 
         const npCard = document.getElementById('now-playing-card');
         if (response.status === 204 || response.status > 400) {
-            if (npCard) npCard.classList.add('hidden');
-            
-            // Si no hay nada sonando, intentar poner el fondo de la última canción escuchada
-            const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=1', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (recentRes.ok) {
-                const recentData = await recentRes.json();
-                if (recentData.items && recentData.items.length > 0) {
-                    updateDynamicBackground(recentData.items[0].track.album.images[0].url);
-                }
-            }
+            // Nada sonando ahora mismo (pausado hace rato, o sin dispositivo activo).
+            // A propósito NO tocamos npCard ni el fondo aquí: se quedan mostrando la
+            // última canción que sí vimos reproduciéndose, para no perder el estilo
+            // de la app (se veía en negro al ocultar la tarjeta). Y a propósito NO
+            // consultamos /recently-played para "adivinar" qué mostrar — esa canción
+            // podría no ser la misma que estaba pausada (aunque Spotify tarde en
+            // registrarla ahí, o el usuario haya cambiado de canción sin que llegara
+            // a sonar), lo que pondría una portada que no corresponde.
+            const playIcon = document.getElementById('play-icon');
+            if (playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Icono Play (pausado)
             return { active: false, trackChanged: false };
         }
 
@@ -62,7 +60,9 @@ export async function checkCurrentlyPlaying(session) {
             }
             return { active: true, trackChanged, track };
         } else {
-            if (npCard) npCard.classList.add('hidden');
+            // Mismo caso que arriba (200 sin item) — dejamos la tarjeta como está.
+            const playIcon = document.getElementById('play-icon');
+            if (playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
             return { active: false, trackChanged: false };
         }
     } catch (error) { 

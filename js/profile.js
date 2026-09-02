@@ -1309,21 +1309,10 @@ async function updateBackground(userId) {
                     bg.classList.add('visible');
                 }
             }
-        } else if (res.status === 204) {
-            const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=1', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (recentRes.ok) {
-                const recentData = await recentRes.json();
-                if (recentData.items && recentData.items.length > 0) {
-                    const imgUrl = recentData.items[0].track.album.images[0].url;
-                    const bg = document.getElementById('album-bg');
-                    if (bg) {
-                        bg.style.backgroundImage = `url(${imgUrl})`;
-                        bg.classList.add('visible');
-                    }
-                }
-            }
         }
+        // Si no hay nada sonando (204/pausado), dejamos el fondo como está —
+        // no lo reemplazamos con /recently-played porque esa canción puede no
+        // ser la misma que se acaba de pausar (Spotify tarda en registrarla
+        // ahí), y pondría una portada que no corresponde.
     } catch (e) {}
 }
