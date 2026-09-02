@@ -21,6 +21,7 @@ export default defineConfig({
                 social: './social.html',
                 profile: './profile.html',
                 duel: './duel.html',
+                player: './player.html',
             },
             plugins: [
                 obfuscatorPlugin({
