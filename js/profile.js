@@ -917,45 +917,48 @@ function filterTrackList(query) {
 
 /**
  * Completa nombre/artista/portada para track_ids sin metadatos cacheados,
- * pidiéndolos a Spotify en lotes de 50 (máximo permitido por /v1/tracks), y
- * los guarda en listening_sessions para que no vuelvan a faltar.
+ * pidiéndolos a Spotify UNO POR UNO (/v1/tracks/{id}) y los guarda en
+ * listening_sessions para que no vuelvan a faltar.
+ *
+ * Antes esto pedía varios IDs de una vez (/v1/tracks?ids=...), pero Spotify
+ * restringió las consultas de metadatos "en bulk" en su cambio de API de
+ * febrero de 2026 — esa llamada ahora falla siempre, por eso TODAS las
+ * canciones de un mes aparecían como "no disponible" en vez de solo las
+ * que de verdad ya no existen en el catálogo. /v1/tracks/{id} (un id a la
+ * vez) sigue funcionando, es el mismo método que ya usa el resto de la app.
  */
 async function resolveMissingTrackMetadata(trackIds) {
     if (!globalToken) return;
 
-    for (let i = 0; i < trackIds.length; i += 50) {
-        const batch = trackIds.slice(i, i + 50);
+    for (const id of trackIds) {
         try {
-            const res = await fetch(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`, {
+            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
                 headers: { Authorization: `Bearer ${globalToken}` }
             });
-            if (!res.ok) continue;
-            const data = await res.json();
+            if (!res.ok) continue; // 404 = el id ya no existe en el catálogo de Spotify
+            const t = await res.json();
 
-            for (const t of (data.tracks || [])) {
-                if (!t) continue; // Spotify devuelve null si el id ya no existe en su catálogo
-                const meta = {
-                    name: t.name,
-                    artist: t.artists?.map(a => a.name).join(', ') || '',
-                    art: t.album?.images?.[t.album.images.length - 1]?.url || t.album?.images?.[0]?.url || ''
-                };
+            const meta = {
+                name: t.name,
+                artist: t.artists?.map(a => a.name).join(', ') || '',
+                art: t.album?.images?.[t.album.images.length - 1]?.url || t.album?.images?.[0]?.url || ''
+            };
 
-                const entry = monthTrackListFull.find(x => x.id === t.id);
-                if (entry) Object.assign(entry, meta);
+            const entry = monthTrackListFull.find(x => x.id === t.id);
+            if (entry) Object.assign(entry, meta);
 
-                // Guardar en BD — puede haber varias filas con el mismo track_id
-                // (la misma canción escuchada varias veces ese mes).
-                supabaseClient.from('listening_sessions')
-                    .update({ track_name: meta.name, artist_name: meta.artist, album_art_url: meta.art })
-                    .eq('user_id', globalUserId)
-                    .eq('track_id', t.id)
-                    .then(({ error }) => { if (error) console.warn('No se pudo guardar metadatos de', t.id, error); });
-            }
+            // Guardar en BD — puede haber varias filas con el mismo track_id
+            // (la misma canción escuchada varias veces ese mes).
+            supabaseClient.from('listening_sessions')
+                .update({ track_name: meta.name, artist_name: meta.artist, album_art_url: meta.art })
+                .eq('user_id', globalUserId)
+                .eq('track_id', t.id)
+                .then(({ error }) => { if (error) console.warn('No se pudo guardar metadatos de', t.id, error); });
 
             // Ritmo suave para no pegarle a Spotify con demasiadas llamadas seguidas.
             await new Promise(r => setTimeout(r, 100));
         } catch (e) {
-            console.warn('Error resolviendo metadatos de tracks:', e);
+            console.warn('Error resolviendo metadatos de track', id, e);
         }
     }
 
