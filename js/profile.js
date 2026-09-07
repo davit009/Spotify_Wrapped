@@ -183,10 +183,14 @@ async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken, 
         topIds.map(async id => {
             if (realtimeTracksMetadata[id]) {
                 const meta = realtimeTracksMetadata[id];
+                // artistName se guarda como "Artista A, Artista B" (todos los
+                // créditos de la canción unidos en un string) — hay que separarlo
+                // para que cada colaborador reciba su propio crédito de tiempo
+                // en vez de que la colaboración cuente como un solo "artista".
                 return {
                     id: id,
                     name: meta.name,
-                    artists: [{ name: meta.artistName }],
+                    artists: meta.artistName.split(', ').map(name => ({ name })),
                     album: { images: [{ url: meta.albumArtUrl }] },
                     external_urls: { spotify: `https://open.spotify.com/track/${id}` }
                 };
