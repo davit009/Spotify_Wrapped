@@ -34,6 +34,26 @@ function animateCounter(el, target, suffix = '') {
     requestAnimationFrame(tick);
 }
 
+// Igual que animateCounter, pero mostrando horas Y minutos (en vez de solo
+// horas redondeadas hacia abajo) — así se nota con precisión que el conteo
+// sí se está moviendo con cada canción, no solo cada que se completa una hora.
+function animateHoursMinutes(el, totalMs) {
+    if (!el) return;
+    const render = ms => {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        el.innerHTML = `${h}<span class="text-xl text-white/40 ml-1 not-italic">h</span> ${m}<span class="text-xl text-white/40 ml-1 not-italic">m</span>`;
+    };
+    if (!totalMs) { render(0); return; }
+    const dur = 1200, t0 = performance.now();
+    const tick = t => {
+        const p = Math.min((t - t0) / dur, 1);
+        render(Math.floor((1 - Math.pow(1 - p, 3)) * totalMs));
+        if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
+
 // ============================================================
 // PLACEHOLDERS SVG (sin dependencias externas)
 // ============================================================
@@ -1151,7 +1171,7 @@ async function renderStats(stats, spotifyToken, year = 'all') {
     document.getElementById('results').classList.remove('hidden');
 
     // Count-up animado
-    animateCounter(document.getElementById('stat-hours'),   stats.hours,             'h');
+    animateHoursMinutes(document.getElementById('stat-hours'), stats.totalMsPlayed || 0);
     animateCounter(document.getElementById('stat-days'),    stats.totalDays || 0,    '');
     animateCounter(document.getElementById('stat-tracks'),  stats.totalUniqueTracks, '');
     animateCounter(document.getElementById('stat-artists'), stats.totalUniqueArtists,'');
