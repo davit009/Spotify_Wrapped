@@ -204,9 +204,16 @@ document.addEventListener('DOMContentLoaded', () => {
 async function mergePeriodTops(periodStats, periodTrackDurations, spotifyToken, realtimeTracksMetadata = {}) {
     if (!periodStats || !periodTrackDurations || Object.keys(periodTrackDurations).length === 0) return;
 
-    const topIds = Object.keys(periodTrackDurations)
-        .sort((a, b) => periodTrackDurations[b] - periodTrackDurations[a])
-        .slice(0, 10);
+    // OJO: candidatas = TODAS las canciones con tiempo real, no solo las 10
+    // con más minutos EN VIVO. El top que se muestra está dominado por el
+    // peso histórico del JSON importado, así que una canción ya podía estar
+    // en el Top 10 mostrado sin estar entre las 10 más escuchadas "solo en
+    // tiempo real" — y si no entraba a esa lista corta, nunca se actualizaba
+    // aunque la volvieras a reproducir (se quedaba congelada con el valor
+    // del JSON para siempre). Al no recortar aquí, cualquier canción con
+    // reproducciones nuevas puede sumar a su entrada existente antes del
+    // ordenar-y-recortar final.
+    const topIds = Object.keys(periodTrackDurations);
 
     const freshTracks = (await Promise.all(
         topIds.map(async id => {
