@@ -935,43 +935,82 @@ function filterTrackList(query) {
  * vez) sigue funcionando, es el mismo método que ya usa el resto de la app.
  */
 async function resolveMissingTrackMetadata(trackIds) {
-    if (!globalToken) return;
-
-    for (const id of trackIds) {
-        try {
-            const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
-                headers: { Authorization: `Bearer ${globalToken}` }
-            });
-            if (!res.ok) continue; // 404 = el id ya no existe en el catálogo de Spotify
-            const t = await res.json();
-
-            const meta = {
-                name: t.name,
-                artist: t.artists?.map(a => a.name).join(', ') || '',
-                art: t.album?.images?.[t.album.images.length - 1]?.url || t.album?.images?.[0]?.url || ''
-            };
-
-            const entry = monthTrackListFull.find(x => x.id === t.id);
-            if (entry) Object.assign(entry, meta);
-
-            // Guardar en BD — puede haber varias filas con el mismo track_id
-            // (la misma canción escuchada varias veces ese mes).
-            supabaseClient.from('listening_sessions')
-                .update({ track_name: meta.name, artist_name: meta.artist, album_art_url: meta.art })
-                .eq('user_id', globalUserId)
-                .eq('track_id', t.id)
-                .then(({ error }) => { if (error) console.warn('No se pudo guardar metadatos de', t.id, error); });
-
-            // Ritmo suave para no pegarle a Spotify con demasiadas llamadas seguidas.
-            await new Promise(r => setTimeout(r, 100));
-        } catch (e) {
-            console.warn('Error resolviendo metadatos de track', id, e);
-        }
+    if (!globalToken) {
+        // Sin token no hay forma de pedirle nada a Spotify — antes esto
+        // dejaba las canciones en "Cargando…" para siempre (nunca se
+        // marcaban como no disponibles), así que parecía que la sección
+        // simplemente no traía título ni imagen. Ahora se avisa igual.
+        console.warn('resolveMissingTrackMetadata: sin token de Spotify, no se puede completar metadatos');
+        monthTrackListFull.forEach(t => { if (!t.name) t.name = '__error__'; });
+        return;
     }
 
-    // Lo que Spotify no pudo resolver (id ya no existe) se marca aparte,
-    // en vez de quedarse en "cargando" para siempre.
-    monthTrackListFull.forEach(t => { if (!t.name) t.name = '__unavailable__'; });
+    for (const id of trackIds) {
+        let attempts = 0;
+        while (attempts < 3) {
+            attempts++;
+            try {
+                const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+                    headers: { Authorization: `Bearer ${globalToken}` }
+                });
+
+                if (res.status === 429) {
+                    // Límite de peticiones de Spotify: pedía una canción tras otra
+                    // con solo 100ms de espera, así que un mes con muchas canciones
+                    // sin metadatos disparaba el rate limit a mitad de camino y TODO
+                    // lo que quedaba fallaba en silencio (se veía como si nada
+                    // cargara). Hay que respetar Retry-After y reintentar esa misma
+                    // canción en vez de darla por perdida.
+                    const retryAfterSec = parseInt(res.headers.get('Retry-After') || '2', 10);
+                    console.warn(`resolveMissingTrackMetadata: rate limit en track ${id}, reintentando en ${retryAfterSec}s`);
+                    await new Promise(r => setTimeout(r, retryAfterSec * 1000));
+                    continue;
+                }
+
+                if (!res.ok) {
+                    if (res.status === 404) {
+                        const entry = monthTrackListFull.find(x => x.id === id);
+                        if (entry) entry.name = '__unavailable__';
+                    } else {
+                        console.warn(`resolveMissingTrackMetadata: track ${id} respondió ${res.status}`);
+                    }
+                    break; // 404 = el id ya no existe en el catálogo de Spotify; otros errores, no reintentamos más
+                }
+
+                const t = await res.json();
+                const meta = {
+                    name: t.name,
+                    artist: t.artists?.map(a => a.name).join(', ') || '',
+                    art: t.album?.images?.[t.album.images.length - 1]?.url || t.album?.images?.[0]?.url || ''
+                };
+
+                const entry = monthTrackListFull.find(x => x.id === t.id);
+                if (entry) Object.assign(entry, meta);
+
+                // Guardar en BD — puede haber varias filas con el mismo track_id
+                // (la misma canción escuchada varias veces ese mes).
+                supabaseClient.from('listening_sessions')
+                    .update({ track_name: meta.name, artist_name: meta.artist, album_art_url: meta.art })
+                    .eq('user_id', globalUserId)
+                    .eq('track_id', t.id)
+                    .then(({ error }) => { if (error) console.warn('No se pudo guardar metadatos de', t.id, error); });
+
+                break;
+            } catch (e) {
+                console.warn('Error resolviendo metadatos de track', id, e);
+                break;
+            }
+        }
+
+        // Ritmo suave para no pegarle a Spotify con demasiadas llamadas seguidas.
+        await new Promise(r => setTimeout(r, 100));
+    }
+
+    // Lo que Spotify confirmó que ya no existe se marca como no disponible;
+    // lo que falló por otra razón (token vencido a mitad de camino, error
+    // de red, etc.) se marca aparte para no confundirlo con "se borró de
+    // Spotify" — en vez de quedarse en "Cargando…" para siempre.
+    monthTrackListFull.forEach(t => { if (!t.name) t.name = '__error__'; });
 }
 
 function renderDailyChart(dailyMs, year, month) {
@@ -1025,8 +1064,9 @@ function renderMonthTrackList(list) {
         const m = Math.floor(t.ms / 60000);
         const art = t.art || TRACK_PLACEHOLDER;
         const isUnavailable = t.name === '__unavailable__';
-        const displayName = isUnavailable ? 'Pista no disponible' : (t.name || 'Cargando…');
-        const displayArtist = isUnavailable ? 'Ya no existe en Spotify' : (t.artist || '');
+        const isError = t.name === '__error__';
+        const displayName = isUnavailable ? 'Pista no disponible' : isError ? 'No se pudo cargar' : (t.name || 'Cargando…');
+        const displayArtist = isUnavailable ? 'Ya no existe en Spotify' : isError ? 'Recarga la página para reintentar' : (t.artist || '');
         return `
             <li class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
                 <span class="text-neutral-600 font-bold w-6 text-center text-xs flex-shrink-0">${i + 1}</span>
