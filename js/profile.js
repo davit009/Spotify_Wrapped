@@ -34,6 +34,15 @@ function animateCounter(el, target, suffix = '') {
     requestAnimationFrame(tick);
 }
 
+// Texto compacto "Xh Ym" (u "Ym" si dura menos de una hora) para badges —
+// usado donde antes se mostraban horas redondeadas hacia abajo, que hacían
+// ver "0h" en artistas/periodos con menos de una hora acumulada.
+function formatHoursMinutesShort(ms) {
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 // Igual que animateCounter, pero mostrando horas Y minutos (en vez de solo
 // horas redondeadas hacia abajo) — así se nota con precisión que el conteo
 // sí se está moviendo con cada canción, no solo cada que se completa una hora.
@@ -1124,9 +1133,8 @@ function renderAdvancedInsights(stats) {
     const monthSubEl = document.getElementById('insight-peak-month-sub');
     if (monthEl && monthSubEl) {
         if (maxMonthMs > 0) {
-            const hours = Math.round(maxMonthMs / 3600000);
             monthEl.textContent = maxMonthName;
-            monthSubEl.textContent = `${hours}h de reproducción`;
+            monthSubEl.textContent = `${formatHoursMinutesShort(maxMonthMs)} de reproducción`;
         } else {
             monthEl.textContent = 'Sin datos';
             monthSubEl.textContent = 'Sigue escuchando';
@@ -1187,7 +1195,7 @@ async function renderStats(stats, spotifyToken, year = 'all') {
     const artistResults = [];
     for (let i = 0; i < stats.topArtists.length; i++) {
         const artist = stats.topArtists[i];
-        const h   = Math.floor(artist.ms / 3600000);
+        const badgeMs = formatHoursMinutesShort(artist.ms);
         const pct = Math.round((artist.ms / artistMax) * 100);
         let imgUrl = getCachedImage('artist_' + artist.name) || ARTIST_PLACEHOLDER;
         const needsFetch = imgUrl === ARTIST_PLACEHOLDER;
@@ -1215,7 +1223,7 @@ async function renderStats(stats, spotifyToken, year = 'all') {
                     <span class="font-bold text-white text-sm block truncate">${artist.name}</span>
                     <div class="artist-bar"><div class="artist-bar-fill" data-pct="${pct}"></div></div>
                 </div>
-                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-2 py-1 rounded-full flex-shrink-0">${h}h</span>
+                <span class="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-2 py-1 rounded-full flex-shrink-0">${badgeMs}</span>
             </li>` });
     }
 
